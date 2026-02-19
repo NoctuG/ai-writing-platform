@@ -70,6 +70,10 @@ export default function Home() {
             </p>
           </div>
 
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold">支持多种论文类型</h2>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-12">
             {paperTypes.map((type) => {
               const Icon = type.icon;
@@ -120,7 +124,7 @@ export default function Home() {
       <main className="container py-12">
         <div className="max-w-3xl mx-auto space-y-8">
           <div className="text-center space-y-4">
-            <h2 className="text-4xl font-bold">开始创作您的学术论文</h2>
+            <h1 className="text-4xl font-bold">开始创作您的学术论文</h1>
             <p className="text-lg text-muted-foreground">
               选择论文类型，输入标题，AI将在1分钟内为您生成完整的论文大纲和内容
             </p>
@@ -188,37 +192,40 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">智能大纲生成</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  根据论文类型和标题，自动生成结构完整、逻辑清晰的论文大纲
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">快速内容生成</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  基于大纲在1分钟内生成8000字以上的学术论文全文内容
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">多格式导出</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  支持导出为Word和PDF格式，方便后续编辑和提交
-                </p>
-              </CardContent>
-            </Card>
+          <div className="space-y-6 pt-8">
+            <h2 className="text-2xl font-semibold text-center">平台核心功能</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">智能大纲生成</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    根据论文类型和标题，自动生成结构完整、逻辑清晰的论文大纲
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">快速内容生成</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    基于大纲在1分钟内生成8000字以上的学术论文全文内容
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">多格式导出</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    支持导出为Word和PDF格式，方便后续编辑和提交
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </main>
