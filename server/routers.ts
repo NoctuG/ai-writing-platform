@@ -104,17 +104,22 @@ export const appRouter = router({
         id: z.number(),
       }))
       .mutation(async ({ ctx, input }) => {
+        console.log('[generateContent] Starting for paperId:', input.id);
         const paper = await getPaperById(input.id);
         if (!paper) {
+          console.error('[generateContent] Paper not found:', input.id);
           throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
         }
         if (paper.userId !== ctx.user.id) {
+          console.error('[generateContent] Forbidden access:', input.id, 'userId:', ctx.user.id);
           throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
         }
         if (!paper.outline) {
+          console.error('[generateContent] No outline found for paperId:', input.id);
           throw new TRPCError({ code: "BAD_REQUEST", message: "请先生成大纲" });
         }
 
+        console.log('[generateContent] Calling LLM for paperId:', input.id);
         try {
           const typeNames = {
             graduation: "毕业论文",
@@ -147,15 +152,19 @@ export const appRouter = router({
             ],
           });
 
+          console.log('[generateContent] LLM response received for paperId:', input.id);
           const contentData = response.choices[0]?.message?.content;
           const content = typeof contentData === 'string' ? contentData : "";
+          console.log('[generateContent] Content length:', content.length, 'characters');
           await updatePaper(input.id, {
             content,
             status: "completed",
           });
+          console.log('[generateContent] Paper updated successfully for paperId:', input.id);
 
           return { content };
         } catch (error) {
+          console.error('[generateContent] Error occurred for paperId:', input.id, error);
           await updatePaper(input.id, {
             status: "failed",
             errorMessage: error instanceof Error ? error.message : "生成内容失败",

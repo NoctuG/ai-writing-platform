@@ -19,7 +19,8 @@ const paperTypeNames = {
 
 export default function PaperGenerate() {
   const { id } = useParams<{ id: string }>();
-  const paperId = parseInt(id || "0");
+  const paperId = id ? parseInt(id, 10) : 0;
+  console.log('[PaperGenerate] URL id:', id, 'parsed paperId:', paperId);
   const [, setLocation] = useLocation();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [progress, setProgress] = useState(0);
@@ -27,7 +28,7 @@ export default function PaperGenerate() {
 
   const { data: paper, isLoading, refetch } = trpc.paper.getById.useQuery(
     { id: paperId },
-    { enabled: !!paperId && isAuthenticated }
+    { enabled: !!paperId && paperId > 0 && isAuthenticated }
   );
 
   const generateOutlineMutation = trpc.paper.generateOutline.useMutation({
@@ -44,13 +45,15 @@ export default function PaperGenerate() {
 
   const generateContentMutation = trpc.paper.generateContent.useMutation({
     onSuccess: () => {
+      console.log('[PaperGenerate] Content generation successful');
       setCurrentStep("completed");
       setProgress(100);
       refetch();
       toast.success("论文生成完成！");
     },
     onError: (error) => {
-      toast.error(error.message || "生成内容失败");
+      console.error('[PaperGenerate] Content generation failed:', error);
+      toast.error(error.message || "生成全文失败");
     },
   });
 
@@ -80,19 +83,28 @@ export default function PaperGenerate() {
       return;
     }
 
+    if (!paperId || paperId <= 0) {
+      toast.error("无效的论文ID");
+      setLocation("/");
+      return;
+    }
+
     if (paper && !paper.outline && currentStep === "outline" && !generateOutlineMutation.isPending) {
       generateOutlineMutation.mutate({ id: paperId });
     }
-  }, [paper, authLoading, isAuthenticated]);
+  }, [paper, authLoading, isAuthenticated, paperId]);
 
   useEffect(() => {
+    if (!paperId || paperId <= 0) return;
+    
     if (paper?.outline && !paper.content && currentStep === "content" && !generateContentMutation.isPending) {
+      console.log('[PaperGenerate] Starting content generation for paperId:', paperId);
       const timer = setTimeout(() => {
         generateContentMutation.mutate({ id: paperId });
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [paper, currentStep]);
+  }, [paper, currentStep, paperId]);
 
   if (authLoading || isLoading) {
     return (
