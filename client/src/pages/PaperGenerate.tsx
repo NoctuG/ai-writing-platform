@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, Download, FileText, Loader2, Sparkles } from "lucide-react";
+import { CheckCircle2, Download, Edit, FileText, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
@@ -246,6 +246,13 @@ export default function PaperGenerate() {
                       <CardTitle>论文全文</CardTitle>
                     </div>
                     <div className="flex gap-2">
+                      <Button 
+                        variant="default"
+                        onClick={() => setLocation(`/paper/${paperId}/edit`)}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        编辑论文
+                      </Button>
                       <Button 
                         variant="outline" 
                         onClick={() => exportWordMutation.mutate({ id: paperId })}

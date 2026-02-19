@@ -47,3 +47,19 @@ export const papers = mysqlTable("papers", {
 
 export type Paper = typeof papers.$inferSelect;
 export type InsertPaper = typeof papers.$inferInsert;
+
+/**
+ * Paper versions table for storing edit history
+ */
+export const paperVersions = mysqlTable("paperVersions", {
+  id: int("id").autoincrement().primaryKey(),
+  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  versionNumber: int("versionNumber").notNull(),
+  outline: text("outline"),
+  content: text("content"),
+  changeDescription: text("changeDescription"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PaperVersion = typeof paperVersions.$inferSelect;
+export type InsertPaperVersion = typeof paperVersions.$inferInsert;

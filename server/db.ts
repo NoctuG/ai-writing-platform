@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertPaper, InsertUser, papers, users } from "../drizzle/schema";
+import { InsertPaper, InsertPaperVersion, InsertUser, paperVersions, papers, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -130,4 +130,40 @@ export async function deletePaper(id: number) {
     throw new Error("Database not available");
   }
   await db.delete(papers).where(eq(papers.id, id));
+}
+
+// Paper version queries
+export async function createPaperVersion(version: InsertPaperVersion) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  const result = await db.insert(paperVersions).values(version);
+  return result[0].insertId;
+}
+
+export async function getPaperVersionsByPaperId(paperId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  return db.select().from(paperVersions).where(eq(paperVersions.paperId, paperId)).orderBy(desc(paperVersions.versionNumber));
+}
+
+export async function getPaperVersionById(id: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  const result = await db.select().from(paperVersions).where(eq(paperVersions.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getLatestVersionNumber(paperId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+  const result = await db.select().from(paperVersions).where(eq(paperVersions.paperId, paperId)).orderBy(desc(paperVersions.versionNumber)).limit(1);
+  return result.length > 0 ? result[0].versionNumber : 0;
 }

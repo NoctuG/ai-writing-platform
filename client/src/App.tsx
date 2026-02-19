@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import PaperGenerate from "./pages/PaperGenerate";
 import PaperList from "./pages/PaperList";
+import PaperEdit from "./pages/PaperEdit";
 
 function Router() {
   return (
@@ -14,6 +15,7 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path="/papers" component={PaperList} />
       <Route path="/paper/:id" component={PaperGenerate} />
+      <Route path="/paper/:id/edit" component={PaperEdit} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

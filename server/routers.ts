@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { createPaper, deletePaper, getPaperById, getPapersByUserId, updatePaper } from "./db";
+import { createPaper, createPaperVersion, deletePaper, getLatestVersionNumber, getPaperById, getPapersByUserId, getPaperVersionById, getPaperVersionsByPaperId, updatePaper } from "./db";
 import { invokeLLM } from "./_core/llm";
 import { TRPCError } from "@trpc/server";
 import { generateWordDocument, generatePdfDocument } from "./documentExport";
@@ -255,6 +255,95 @@ export const appRouter = router({
         } catch (error) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "导出PDF失败" });
         }
+      }),
+
+    saveEdit: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        outline: z.string().optional(),
+        content: z.string().optional(),
+        changeDescription: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const paper = await getPaperById(input.id);
+        if (!paper) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
+        }
+        if (paper.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
+        }
+
+        // Create a version snapshot before updating
+        const latestVersion = await getLatestVersionNumber(input.id);
+        const newVersionNumber = latestVersion + 1;
+
+        await createPaperVersion({
+          paperId: input.id,
+          versionNumber: newVersionNumber,
+          outline: input.outline || paper.outline || null,
+          content: input.content || paper.content || null,
+          changeDescription: input.changeDescription || "编辑修改",
+        });
+
+        // Update the paper
+        const updates: Partial<typeof paper> = {};
+        if (input.outline !== undefined) updates.outline = input.outline;
+        if (input.content !== undefined) updates.content = input.content;
+
+        await updatePaper(input.id, updates);
+
+        return { success: true, versionNumber: newVersionNumber };
+      }),
+
+    getVersions: protectedProcedure
+      .input(z.object({ paperId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const paper = await getPaperById(input.paperId);
+        if (!paper) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
+        }
+        if (paper.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
+        }
+
+        return getPaperVersionsByPaperId(input.paperId);
+      }),
+
+    restoreVersion: protectedProcedure
+      .input(z.object({ versionId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const version = await getPaperVersionById(input.versionId);
+        if (!version) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "版本不存在" });
+        }
+
+        const paper = await getPaperById(version.paperId);
+        if (!paper) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
+        }
+        if (paper.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
+        }
+
+        // Create a new version before restoring
+        const latestVersion = await getLatestVersionNumber(version.paperId);
+        const newVersionNumber = latestVersion + 1;
+
+        await createPaperVersion({
+          paperId: version.paperId,
+          versionNumber: newVersionNumber,
+          outline: version.outline,
+          content: version.content,
+          changeDescription: `恢复到版本 ${version.versionNumber}`,
+        });
+
+        // Restore the version
+        await updatePaper(version.paperId, {
+          outline: version.outline || undefined,
+          content: version.content || undefined,
+        });
+
+        return { success: true };
       }),
   }),
 });
