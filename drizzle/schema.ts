@@ -25,4 +25,25 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * Papers table for storing academic paper generation records
+ */
+export const papers = mysqlTable("papers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  type: mysqlEnum("type", ["graduation", "journal", "proposal", "professional"]).notNull(),
+  status: mysqlEnum("status", ["generating", "completed", "failed"]).default("generating").notNull(),
+  outline: text("outline"),
+  content: text("content"),
+  wordFileKey: text("wordFileKey"),
+  wordFileUrl: text("wordFileUrl"),
+  pdfFileKey: text("pdfFileKey"),
+  pdfFileUrl: text("pdfFileUrl"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Paper = typeof papers.$inferSelect;
+export type InsertPaper = typeof papers.$inferInsert;
