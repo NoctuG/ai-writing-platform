@@ -8,6 +8,9 @@ import Home from "./pages/Home";
 import PaperGenerate from "./pages/PaperGenerate";
 import PaperList from "./pages/PaperList";
 import PaperEdit from "./pages/PaperEdit";
+import Pricing from "./pages/Pricing";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancel from "./pages/PaymentCancel";
 
 function Router() {
   return (
@@ -16,6 +19,9 @@ function Router() {
       <Route path="/papers" component={PaperList} />
       <Route path="/paper/:id" component={PaperGenerate} />
       <Route path="/paper/:id/edit" component={PaperEdit} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/payment/success" component={PaymentSuccess} />
+      <Route path="/payment/cancel" component={PaymentCancel} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertPaper, InsertPaperVersion, InsertUser, paperVersions, papers, users } from "../drizzle/schema";
+import { InsertPaper, InsertPaperVersion, InsertUser, paperVersions, papers, users, references, InsertReference, qualityChecks, InsertQualityCheck } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -166,4 +166,58 @@ export async function getLatestVersionNumber(paperId: number): Promise<number> {
   }
   const result = await db.select().from(paperVersions).where(eq(paperVersions.paperId, paperId)).orderBy(desc(paperVersions.versionNumber)).limit(1);
   return result.length > 0 ? result[0].versionNumber : 0;
+}
+
+// Reference functions
+export async function createReference(reference: InsertReference) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(references).values(reference);
+  return result[0].insertId;
+}
+
+export async function getReferencesByPaperId(paperId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(references).where(eq(references.paperId, paperId));
+}
+
+export async function deleteReference(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(references).where(eq(references.id, id));
+}
+
+export async function updateReference(id: number, data: Partial<InsertReference>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(references).set(data).where(eq(references.id, id));
+}
+
+// Quality check functions
+export async function createQualityCheck(check: InsertQualityCheck) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(qualityChecks).values(check);
+  return result[0].insertId;
+}
+
+export async function getQualityChecksByPaperId(paperId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(qualityChecks).where(eq(qualityChecks.paperId, paperId)).orderBy(desc(qualityChecks.createdAt));
+}
+
+export async function getLatestQualityCheck(paperId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(qualityChecks).where(eq(qualityChecks.paperId, paperId)).orderBy(desc(qualityChecks.createdAt)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }

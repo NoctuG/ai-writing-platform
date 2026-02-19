@@ -17,6 +17,10 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }), // Stripe customer ID
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Active subscription ID
+  subscriptionStatus: mysqlEnum("subscriptionStatus", ["none", "active", "canceled", "past_due"]).default("none"),
+  subscriptionEndDate: timestamp("subscriptionEndDate"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -63,3 +67,62 @@ export const paperVersions = mysqlTable("paperVersions", {
 
 export type PaperVersion = typeof paperVersions.$inferSelect;
 export type InsertPaperVersion = typeof paperVersions.$inferInsert;
+
+/**
+ * References table for storing paper references/citations
+ */
+export const references = mysqlTable("references", {
+  id: int("id").autoincrement().primaryKey(),
+  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  authors: text("authors").notNull(), // JSON array of author names
+  year: int("year"),
+  journal: text("journal"),
+  volume: varchar("volume", { length: 50 }),
+  issue: varchar("issue", { length: 50 }),
+  pages: varchar("pages", { length: 50 }),
+  doi: varchar("doi", { length: 255 }),
+  url: text("url"),
+  citationFormat: mysqlEnum("citationFormat", ["gbt7714", "apa", "mla", "chicago"]).default("gbt7714").notNull(),
+  formattedCitation: text("formattedCitation"), // Pre-formatted citation string
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Reference = typeof references.$inferSelect;
+export type InsertReference = typeof references.$inferInsert;
+
+/**
+ * Quality checks table for storing paper quality assessment results
+ */
+export const qualityChecks = mysqlTable("qualityChecks", {
+  id: int("id").autoincrement().primaryKey(),
+  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  overallScore: int("overallScore").notNull(), // 0-100
+  plagiarismScore: int("plagiarismScore"), // 0-100, higher means more plagiarism
+  grammarScore: int("grammarScore"), // 0-100
+  academicStyleScore: int("academicStyleScore"), // 0-100
+  structureScore: int("structureScore"), // 0-100
+  issues: text("issues"), // JSON array of detected issues
+  suggestions: text("suggestions"), // JSON array of improvement suggestions
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type QualityCheck = typeof qualityChecks.$inferSelect;
+export type InsertQualityCheck = typeof qualityChecks.$inferInsert;
+
+/**
+ * Polish history table for storing AI text polishing records
+ */
+export const polishHistory = mysqlTable("polishHistory", {
+  id: int("id").autoincrement().primaryKey(),
+  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  originalText: text("originalText").notNull(),
+  polishedText: text("polishedText").notNull(),
+  polishType: mysqlEnum("polishType", ["expression", "grammar", "academic", "comprehensive"]).notNull(),
+  suggestions: text("suggestions"), // JSON array of alternative suggestions
+  applied: int("applied").default(0).notNull(), // 0 = not applied, 1 = applied
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PolishHistory = typeof polishHistory.$inferSelect;
+export type InsertPolishHistory = typeof polishHistory.$inferInsert;

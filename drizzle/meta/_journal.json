@@ -22,6 +22,20 @@
       "when": 1771506211928,
       "tag": "0002_swift_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1771507037504,
+      "tag": "0003_motionless_blue_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1771507194285,
+      "tag": "0004_thin_sunspot",
+      "breakpoints": true
     }
   ]
 }
