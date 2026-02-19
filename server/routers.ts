@@ -10,11 +10,7 @@ import { invokeLLM } from "./_core/llm";
 import { TRPCError } from "@trpc/server";
 import { generateWordDocument, generatePdfDocument } from "./documentExport";
 import { polishText, polishParagraphs, type PolishType } from "./textPolisher";
-import { stripe } from "./_core/stripe";
-import { products, getProductById } from "./products";
-import { getDb } from "./db";
-import { users } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -355,80 +351,6 @@ export const appRouter = router({
       }),
   }),
 
-  payment: router({
-    getProducts: publicProcedure.query(() => {
-      return products;
-    }),
-
-    createCheckoutSession: protectedProcedure
-      .input(z.object({
-        productId: z.string(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        const product = getProductById(input.productId);
-        if (!product) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "产品不存在" });
-        }
-
-        const origin = ctx.req.headers.origin || "http://localhost:3000";
-
-        try {
-          const sessionParams: any = {
-            mode: product.type === "subscription" ? "subscription" : "payment",
-            line_items: [
-              {
-                price: product.priceId,
-                quantity: 1,
-              },
-            ],
-            success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${origin}/payment/cancel`,
-            customer_email: ctx.user.email || undefined,
-            client_reference_id: ctx.user.id.toString(),
-            metadata: {
-              user_id: ctx.user.id.toString(),
-              customer_email: ctx.user.email || "",
-              customer_name: ctx.user.name || "",
-              product_id: product.id,
-            },
-            allow_promotion_codes: true,
-          };
-
-          const session = await stripe.checkout.sessions.create(sessionParams);
-
-          return { url: session.url };
-        } catch (error: any) {
-          console.error("[Stripe] Failed to create checkout session:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "创建支付会话失败" });
-        }
-      }),
-
-    getSubscriptionStatus: protectedProcedure.query(async ({ ctx }) => {
-      return {
-        status: ctx.user.subscriptionStatus || "none",
-        endDate: ctx.user.subscriptionEndDate,
-        hasActiveSubscription: ctx.user.subscriptionStatus === "active",
-      };
-    }),
-
-    cancelSubscription: protectedProcedure.mutation(async ({ ctx }) => {
-      if (!ctx.user.stripeSubscriptionId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "没有活跃的订阅" });
-      }
-
-      try {
-        await stripe.subscriptions.update(ctx.user.stripeSubscriptionId, {
-          cancel_at_period_end: true,
-        });
-
-        return { success: true, message: "订阅将在当前计费周期结束后取消" };
-      } catch (error: any) {
-        console.error("[Stripe] Failed to cancel subscription:", error);
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "取消订阅失败" });
-      }
-      }),
-  }),
-
   reference: router({
     search: protectedProcedure
       .input(z.object({
@@ -694,6 +616,117 @@ export const appRouter = router({
         } catch (error: any) {
           console.error("[Polish Paragraphs] Error:", error);
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "批量润色失败" });
+        }
+      }),
+  }),
+
+  dashboard: router({
+    getStatistics: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const papers = await getPapersByUserId(ctx.user.id);
+        const qualityChecks = [];
+        const references = [];
+
+        for (const paper of papers) {
+          const checks = await getQualityChecksByPaperId(paper.id);
+          qualityChecks.push(...checks);
+
+          const refs = await getReferencesByPaperId(paper.id);
+          references.push(...refs);
+        }
+
+        // 计算统计数据
+        const totalPapers = papers.length;
+        const completedPapers = papers.filter((p) => p.status === "completed").length;
+        const averageQualityScore =
+          qualityChecks.length > 0
+            ? qualityChecks.reduce((sum, c) => sum + c.overallScore, 0) / qualityChecks.length
+            : 0;
+
+        // 质量评分趋势（最近30天）
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentChecks = qualityChecks
+          .filter((c) => new Date(c.createdAt) >= thirtyDaysAgo)
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+        const qualityTrend = recentChecks.map((check) => ({
+          date: new Date(check.createdAt).toISOString().split("T")[0],
+          score: check.overallScore,
+        }));
+
+        // 引用格式分布
+        const formatCounts: Record<string, number> = {};
+        references.forEach((ref) => {
+          const format = ref.citationFormat || "gbt7714";
+          formatCounts[format] = (formatCounts[format] || 0) + 1;
+        });
+
+        const citationFormatDistribution = Object.entries(formatCounts).map(([format, count]) => ({
+          format,
+          count,
+        }));
+
+        // 论文类型分布
+        const typeCounts: Record<string, number> = {};
+        papers.forEach((paper) => {
+          const type = paper.type || "unknown";
+          typeCounts[type] = (typeCounts[type] || 0) + 1;
+        });
+
+        const paperTypeDistribution = Object.entries(typeCounts).map(([type, count]) => ({
+          type,
+          count,
+        }));
+
+        return {
+          totalPapers,
+          completedPapers,
+          averageQualityScore: Math.round(averageQualityScore * 10) / 10,
+          qualityTrend,
+          citationFormatDistribution,
+          paperTypeDistribution,
+          recentPapers: papers.slice(0, 5).map((p) => ({
+            id: p.id,
+            title: p.title,
+            type: p.type,
+            status: p.status,
+            createdAt: p.createdAt,
+          })),
+        };
+      } catch (error: any) {
+        console.error("[Dashboard] Error:", error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "获取统计数据失败" });
+      }
+    }),
+
+    getQualityComparison: protectedProcedure
+      .input(z.object({ paperIds: z.array(z.number()) }))
+      .query(async ({ input }) => {
+        try {
+          const comparisons = [];
+
+          for (const paperId of input.paperIds) {
+            const paper = await getPaperById(paperId);
+            const latestCheck = await getLatestQualityCheck(paperId);
+
+            if (paper && latestCheck) {
+              comparisons.push({
+                paperId: paper.id,
+                title: paper.title,
+                overallScore: latestCheck.overallScore,
+                plagiarismScore: latestCheck.plagiarismScore,
+                grammarScore: latestCheck.grammarScore,
+                academicStyleScore: latestCheck.academicStyleScore,
+                structureScore: latestCheck.structureScore,
+              });
+            }
+          }
+
+          return comparisons;
+        } catch (error: any) {
+          console.error("[Dashboard] Quality comparison error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "质量对比失败" });
         }
       }),
   }),

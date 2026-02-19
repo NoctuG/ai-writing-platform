@@ -111,8 +111,8 @@ export default function Home() {
             AI学术论文写作平台
           </h1>
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => setLocation("/pricing")}>
-              定价
+            <Button variant="ghost" onClick={() => setLocation("/dashboard")}>
+              仪表板
             </Button>
             <Button variant="ghost" onClick={() => setLocation("/papers")}>
               我的论文

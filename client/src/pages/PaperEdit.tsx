@@ -12,13 +12,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Clock, Download, History, Loader2, RotateCcw, Save } from "lucide-react";
+import { ArrowLeft, Clock, Download, History, Loader2, RotateCcw, Save, BookOpen, CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import MarkdownEditor from "@/components/MarkdownEditor";
+import ReferenceManager from "@/components/ReferenceManager";
+import QualityCheckResult from "@/components/QualityCheckResult";
+import PolishToolbar from "@/components/PolishToolbar";
 import { formatDistanceToNow } from "date-fns";
 import { zhCN } from "date-fns/locale";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const paperTypeNames = {
   graduation: "毕业论文",
@@ -36,6 +40,8 @@ export default function PaperEdit() {
   const [content, setContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
+  const [showQualityCheck, setShowQualityCheck] = useState(false);
+  const [selectedText, setSelectedText] = useState("");
   const utils = trpc.useUtils();
 
   const { data: paper, isLoading } = trpc.paper.getById.useQuery(
@@ -47,6 +53,22 @@ export default function PaperEdit() {
     { paperId },
     { enabled: !!paperId && isAuthenticated }
   );
+
+  const { data: qualityChecks } = trpc.quality.getHistory.useQuery(
+    { paperId },
+    { enabled: !!paperId && isAuthenticated }
+  );
+
+  const checkQualityMutation = trpc.quality.check.useMutation({
+    onSuccess: () => {
+      utils.quality.getHistory.invalidate({ paperId });
+      toast.success("质量检测完成");
+      setShowQualityCheck(true);
+    },
+    onError: (error) => {
+      toast.error(`检测失败: ${error.message}`);
+    },
+  });
 
   const saveEditMutation = trpc.paper.saveEdit.useMutation({
     onSuccess: () => {
@@ -230,6 +252,63 @@ export default function PaperEdit() {
                   </>
                 )}
               </Button>
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    参考文献
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-[400px] sm:w-[540px]">
+                  <SheetHeader>
+                    <SheetTitle>参考文献管理</SheetTitle>
+                    <SheetDescription>
+                      搜索、添加和管理论文的参考文献
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="mt-4 h-[calc(100vh-120px)]">
+                    <ReferenceManager paperId={paperId} />
+                  </div>
+                </SheetContent>
+              </Sheet>
+              <Dialog open={showQualityCheck} onOpenChange={setShowQualityCheck}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!qualityChecks || qualityChecks.length === 0) {
+                        checkQualityMutation.mutate({ paperId });
+                      } else {
+                        setShowQualityCheck(true);
+                      }
+                    }}
+                    disabled={checkQualityMutation.isPending}
+                  >
+                    {checkQualityMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        检测中...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        质量检测
+                      </>
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>论文质量检测报告</DialogTitle>
+                    <DialogDescription>
+                      查看论文的质量评分和改进建议
+                    </DialogDescription>
+                  </DialogHeader>
+                  {qualityChecks && qualityChecks.length > 0 && (
+                    <QualityCheckResult result={qualityChecks[0]} />
+                  )}
+                </DialogContent>
+              </Dialog>
               <Button
                 variant="outline"
                 onClick={() => exportWordMutation.mutate({ id: paperId })}
@@ -262,16 +341,43 @@ export default function PaperEdit() {
           <TabsContent value="outline" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>论文大纲</CardTitle>
-                <CardDescription>编辑论文的结构大纲</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>论文大纲</CardTitle>
+                    <CardDescription>编辑论文的结构大纲</CardDescription>
+                  </div>
+                  <PolishToolbar
+                    selectedText={selectedText}
+                    onReplace={(newText) => {
+                      const textarea = document.querySelector(".rc-md-editor textarea") as HTMLTextAreaElement;
+                      if (textarea && selectedText) {
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const newValue = outline.substring(0, start) + newText + outline.substring(end);
+                        setOutline(newValue);
+                        setSelectedText("");
+                      }
+                    }}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
-                <MarkdownEditor
-                  value={outline}
-                  onChange={setOutline}
-                  placeholder="请输入论文大纲..."
-                  height={700}
-                />
+                <div
+                  onMouseUp={() => {
+                    const selection = window.getSelection();
+                    const text = selection?.toString() || "";
+                    if (text.trim()) {
+                      setSelectedText(text);
+                    }
+                  }}
+                >
+                  <MarkdownEditor
+                    value={outline}
+                    onChange={setOutline}
+                    placeholder="请输入论文大纲..."
+                    height={700}
+                  />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -279,16 +385,43 @@ export default function PaperEdit() {
           <TabsContent value="content" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>论文全文</CardTitle>
-                <CardDescription>编辑论文的完整内容</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>论文全文</CardTitle>
+                    <CardDescription>编辑论文的完整内容</CardDescription>
+                  </div>
+                  <PolishToolbar
+                    selectedText={selectedText}
+                    onReplace={(newText) => {
+                      const textarea = document.querySelector(".rc-md-editor textarea") as HTMLTextAreaElement;
+                      if (textarea && selectedText) {
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const newValue = content.substring(0, start) + newText + content.substring(end);
+                        setContent(newValue);
+                        setSelectedText("");
+                      }
+                    }}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
-                <MarkdownEditor
-                  value={content}
-                  onChange={setContent}
-                  placeholder="请输入论文全文..."
-                  height={700}
-                />
+                <div
+                  onMouseUp={() => {
+                    const selection = window.getSelection();
+                    const text = selection?.toString() || "";
+                    if (text.trim()) {
+                      setSelectedText(text);
+                    }
+                  }}
+                >
+                  <MarkdownEditor
+                    value={content}
+                    onChange={setContent}
+                    placeholder="请输入论文全文..."
+                    height={700}
+                  />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
