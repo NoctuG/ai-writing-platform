@@ -81,14 +81,14 @@ export default function PaperGenerate() {
     }
 
     if (paper && !paper.outline && currentStep === "outline" && !generateOutlineMutation.isPending) {
-      generateOutlineMutation.mutate({ paperId });
+      generateOutlineMutation.mutate({ id: paperId });
     }
   }, [paper, authLoading, isAuthenticated]);
 
   useEffect(() => {
     if (paper?.outline && !paper.content && currentStep === "content" && !generateContentMutation.isPending) {
       const timer = setTimeout(() => {
-        generateContentMutation.mutate({ paperId });
+        generateContentMutation.mutate({ id: paperId });
       }, 1000);
       return () => clearTimeout(timer);
     }

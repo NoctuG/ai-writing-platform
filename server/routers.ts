@@ -44,10 +44,10 @@ export const appRouter = router({
 
     generateOutline: protectedProcedure
       .input(z.object({
-        paperId: z.number(),
+        id: z.number(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const paper = await getPaperById(input.paperId);
+        const paper = await getPaperById(input.id);
         if (!paper) {
           throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
         }
@@ -87,11 +87,11 @@ export const appRouter = router({
 
           const outlineContent = response.choices[0]?.message?.content;
           const outline = typeof outlineContent === 'string' ? outlineContent : "";
-          await updatePaper(input.paperId, { outline });
+          await updatePaper(input.id, { outline });
 
           return { outline };
         } catch (error) {
-          await updatePaper(input.paperId, {
+          await updatePaper(input.id, {
             status: "failed",
             errorMessage: error instanceof Error ? error.message : "生成大纲失败",
           });
@@ -101,10 +101,10 @@ export const appRouter = router({
 
     generateContent: protectedProcedure
       .input(z.object({
-        paperId: z.number(),
+        id: z.number(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const paper = await getPaperById(input.paperId);
+        const paper = await getPaperById(input.id);
         if (!paper) {
           throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
         }
@@ -149,14 +149,14 @@ export const appRouter = router({
 
           const contentData = response.choices[0]?.message?.content;
           const content = typeof contentData === 'string' ? contentData : "";
-          await updatePaper(input.paperId, {
+          await updatePaper(input.id, {
             content,
             status: "completed",
           });
 
           return { content };
         } catch (error) {
-          await updatePaper(input.paperId, {
+          await updatePaper(input.id, {
             status: "failed",
             errorMessage: error instanceof Error ? error.message : "生成内容失败",
           });
