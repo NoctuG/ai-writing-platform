@@ -51,11 +51,25 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  if (process.env.NODE_ENV === "production") {
+    const prodPort = Number.parseInt(process.env.PORT ?? "", 10);
 
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+    if (!Number.isInteger(prodPort) || prodPort <= 0) {
+      throw new Error("PORT must be set to a valid positive integer in production");
+    }
+
+    server.listen(prodPort, () => {
+      console.log(`Server running on http://localhost:${prodPort}/`);
+    });
+    return;
+  }
+
+  const preferredPort = Number.parseInt(process.env.PORT ?? "3000", 10);
+  const startPort = Number.isInteger(preferredPort) && preferredPort > 0 ? preferredPort : 3000;
+  const port = await findAvailablePort(startPort);
+
+  if (port !== startPort) {
+    console.log(`Port ${startPort} is busy, using port ${port} instead`);
   }
 
   server.listen(port, () => {
