@@ -1,9 +1,9 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/fluent/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/fluent/card";
+import { Input } from "@/components/fluent/input";
+import { Label } from "@/components/fluent/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/fluent/select";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { BarChart3, BookOpen, FileText, FolderOpen, GraduationCap, Languages, Sparkles, Database, FileCode } from "lucide-react";
