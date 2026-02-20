@@ -8,6 +8,7 @@ import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
 import { motion } from "framer-motion";
 import { DistributionChartCard } from "@/components/DistributionChartCard";
+import FluentEmptyState, { createEmptyStateCopy } from "@/components/FluentEmptyState";
 
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -297,13 +298,19 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">还没有创建任何论文</p>
-                <Button className="mt-4" onClick={() => setLocation("/")}>
-                  开始创建
-                </Button>
-              </div>
+              <FluentEmptyState
+                icon={FileText}
+                title="还没有创建任何论文"
+                copy={createEmptyStateCopy({
+                  reason: "当前统计周期内暂无论文记录，因此无法展示最近创作动态。",
+                  nextStep: "先创建一篇新论文，稍后即可在这里快速回到最近编辑项。",
+                  actionLabel: "开始创建",
+                })}
+                primaryAction={{
+                  label: "开始创建",
+                  onClick: () => setLocation("/"),
+                }}
+              />
             )}
           </CardContent>
         </Card>
