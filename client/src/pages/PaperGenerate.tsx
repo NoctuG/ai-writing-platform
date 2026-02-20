@@ -240,7 +240,7 @@ export default function PaperGenerate() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-sm max-w-none">
+                <div className="prose prose-sm prose-thesis dark:prose-invert max-w-none">
                   <Streamdown>{paper.outline}</Streamdown>
                 </div>
               </CardContent>
@@ -303,7 +303,7 @@ export default function PaperGenerate() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="prose prose-sm max-w-none">
+                  <div className="prose prose-sm prose-thesis dark:prose-invert max-w-none">
                     <Streamdown>{paper.content}</Streamdown>
                   </div>
                 </CardContent>
