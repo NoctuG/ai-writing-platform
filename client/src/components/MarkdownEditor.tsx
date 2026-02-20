@@ -9,12 +9,14 @@ import MarkdownIt from "markdown-it";
 import MdEditor from "react-markdown-editor-lite";
 import "react-markdown-editor-lite/lib/index.css";
 import { Card } from "./ui/card";
+import { cn } from "@/lib/utils";
 
 interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   height?: number;
+  className?: string;
 }
 
 export interface MarkdownEditorHandle {
@@ -28,7 +30,10 @@ export interface MarkdownEditorHandle {
 const mdParser = new MarkdownIt();
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  function MarkdownEditor({ value, onChange, placeholder, height = 600 }, ref) {
+  function MarkdownEditor(
+    { value, onChange, placeholder, height = 600, className },
+    ref
+  ) {
     const [editorValue, setEditorValue] = useState(value);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const editorRef = useRef<any>(null);
@@ -67,7 +72,19 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     }));
 
     return (
-      <Card className="overflow-hidden">
+      <Card
+        className={cn(
+          "overflow-hidden w-full",
+          "[&_.rc-md-editor]:bg-background [&_.rc-md-editor]:text-[15px]",
+          "[&_.editor-container]:font-serif [&_.editor-container]:leading-8",
+          "[&_.section]:min-h-full",
+          "[&_.section-container]:px-2 md:[&_.section-container]:px-6",
+          "[&_.rc-md-editor_.sec-md_.input]:tracking-[0.02em]",
+          "[&_.rc-md-editor_.sec-md_.input]:leading-8",
+          "[&_.rc-md-editor_.sec-html]:leading-8",
+          className
+        )}
+      >
         <MdEditor
           ref={editorRef}
           value={editorValue}

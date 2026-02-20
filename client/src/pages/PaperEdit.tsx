@@ -9,7 +9,12 @@ import {
   CardTitle,
 } from "@/components/fluent/card";
 import { Separator } from "@/components/fluent/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/fluent/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/fluent/tabs";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +66,9 @@ const paperTypeNames = {
   professional: "职称论文",
 };
 
+const FOCUS_MODE_STORAGE_KEY = "paper-edit-focus-mode";
+const FOCUS_SHORTCUT_HINT_KEY = "paper-edit-focus-shortcut-hint-shown";
+
 export default function PaperEdit() {
   const { id } = useParams<{ id: string }>();
   const paperId = parseInt(id || "0");
@@ -72,9 +80,7 @@ export default function PaperEdit() {
   const [showVersions, setShowVersions] = useState(false);
   const [showQualityCheck, setShowQualityCheck] = useState(false);
   const [selectedText, setSelectedText] = useState("");
-  const [isFocusMode, setIsFocusMode] = useState(
-    () => new URLSearchParams(window.location.search).get("focus") === "1"
-  );
+  const [isFocusMode, setIsFocusMode] = useState(false);
   const [showLatexDialog, setShowLatexDialog] = useState(false);
   const [showChartDialog, setShowChartDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<"outline" | "content">("outline");
@@ -194,7 +200,51 @@ export default function PaperEdit() {
   }, [paper]);
 
   useEffect(() => {
+    const searchFocus = new URLSearchParams(window.location.search).get(
+      "focus"
+    );
+    const persistedFocus = window.localStorage.getItem(FOCUS_MODE_STORAGE_KEY);
+    const nextFocus =
+      searchFocus === "1" || (searchFocus === null && persistedFocus === "1");
+
+    setIsFocusMode(nextFocus);
+
+    if (searchFocus === null && nextFocus) {
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.set("focus", "1");
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}?${nextParams.toString()}${window.location.hash}`
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const searchFocus = new URLSearchParams(window.location.search).get(
+        "focus"
+      );
+      setIsFocusMode(searchFocus === "1");
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
     const onKeydown = (event: KeyboardEvent) => {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === "z"
+      ) {
+        event.preventDefault();
+        setIsFocusMode(prev => !prev);
+
+        return;
+      }
+
       if (event.key === "Escape") {
         setIsFocusMode(false);
       }
@@ -205,6 +255,18 @@ export default function PaperEdit() {
   }, []);
 
   useEffect(() => {
+    if (isFocusMode && !window.localStorage.getItem(FOCUS_SHORTCUT_HINT_KEY)) {
+      toast.info("提示：可用 Ctrl/Cmd + Shift + Z 快速切换专注模式");
+      window.localStorage.setItem(FOCUS_SHORTCUT_HINT_KEY, "1");
+    }
+  }, [isFocusMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      FOCUS_MODE_STORAGE_KEY,
+      isFocusMode ? "1" : "0"
+    );
+
     const searchParams = new URLSearchParams(window.location.search);
     if (isFocusMode) {
       searchParams.set("focus", "1");
@@ -543,18 +605,6 @@ export default function PaperEdit() {
         </header>
       )}
 
-      {isFocusMode && (
-        <div
-          className="sticky top-2 z-20 flex justify-end px-2 md:px-6 pt-2"
-          data-testid="focus-toolbar"
-        >
-          <Button variant="outline" onClick={() => setIsFocusMode(false)}>
-            <Minimize className="mr-2 h-4 w-4" />
-            退出专注
-          </Button>
-        </div>
-      )}
-
       <main
         className={cn(
           "container py-8",
@@ -567,89 +617,116 @@ export default function PaperEdit() {
           onValueChange={value => setActiveTab(value as "outline" | "content")}
           className="space-y-6"
         >
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="outline">编辑大纲</TabsTrigger>
-            <TabsTrigger value="content">编辑全文</TabsTrigger>
-          </TabsList>
+          <div
+            className={cn(
+              "flex items-center justify-between gap-4",
+              isFocusMode &&
+                "sticky top-3 z-20 rounded-lg border bg-background/95 px-3 py-2 backdrop-blur"
+            )}
+          >
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="outline">编辑大纲</TabsTrigger>
+              <TabsTrigger value="content">编辑全文</TabsTrigger>
+            </TabsList>
 
-          <div className="flex justify-end">
-            <Dialog open={showChartDialog} onOpenChange={setShowChartDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline">插入图表</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>选择图表</DialogTitle>
-                  <DialogDescription>
-                    选择图表后将插入到当前编辑中的标签页
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3">
-                  {!chartList || chartList.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      当前论文暂无可用图表，请先在图表工具中生成图表。
-                    </p>
-                  ) : (
-                    chartList.map(chart => (
-                      <Card key={chart.id}>
-                        <CardContent className="py-4 flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-medium">{chart.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {chart.chartType} ·{" "}
-                              {new Date(chart.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              insertChartMarkdown(toChartMarkdown(chart));
-                              setShowChartDialog(false);
-                            }}
-                          >
-                            插入
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
+            {isFocusMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsFocusMode(false)}
+              >
+                <Minimize className="mr-2 h-4 w-4" />
+                退出专注
+              </Button>
+            )}
           </div>
+
+          {!isFocusMode && (
+            <div className="flex justify-end">
+              <Dialog open={showChartDialog} onOpenChange={setShowChartDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">插入图表</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>选择图表</DialogTitle>
+                    <DialogDescription>
+                      选择图表后将插入到当前编辑中的标签页
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    {!chartList || chartList.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        当前论文暂无可用图表，请先在图表工具中生成图表。
+                      </p>
+                    ) : (
+                      chartList.map(chart => (
+                        <Card key={chart.id}>
+                          <CardContent className="py-4 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-medium">{chart.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {chart.chartType} ·{" "}
+                                {new Date(chart.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                insertChartMarkdown(toChartMarkdown(chart));
+                                setShowChartDialog(false);
+                              }}
+                            >
+                              插入
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
 
           <TabsContent value="outline" className="space-y-4">
             <Card
               className={cn(isFocusMode && "border-0 shadow-none rounded-none")}
             >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>论文大纲</CardTitle>
-                    <CardDescription>编辑论文的结构大纲</CardDescription>
+              {!isFocusMode && (
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>论文大纲</CardTitle>
+                      <CardDescription>编辑论文的结构大纲</CardDescription>
+                    </div>
+                    <PolishToolbar
+                      selectedText={selectedText}
+                      onReplace={newText => {
+                        const textarea = document.querySelector(
+                          ".rc-md-editor textarea"
+                        ) as HTMLTextAreaElement;
+                        if (textarea && selectedText) {
+                          const start = textarea.selectionStart;
+                          const end = textarea.selectionEnd;
+                          const newValue =
+                            outline.substring(0, start) +
+                            newText +
+                            outline.substring(end);
+                          setOutline(newValue);
+                          setSelectedText("");
+                        }
+                      }}
+                    />
                   </div>
-                  <PolishToolbar
-                    selectedText={selectedText}
-                    onReplace={newText => {
-                      const textarea = document.querySelector(
-                        ".rc-md-editor textarea"
-                      ) as HTMLTextAreaElement;
-                      if (textarea && selectedText) {
-                        const start = textarea.selectionStart;
-                        const end = textarea.selectionEnd;
-                        const newValue =
-                          outline.substring(0, start) +
-                          newText +
-                          outline.substring(end);
-                        setOutline(newValue);
-                        setSelectedText("");
-                      }
-                    }}
-                  />
-                </div>
-              </CardHeader>
+                </CardHeader>
+              )}
               <CardContent className={cn(isFocusMode && "px-0 pb-0")}>
                 <div
+                  className={cn(
+                    "mx-auto w-full max-w-[1220px]",
+                    isFocusMode && "max-w-[960px] pb-6"
+                  )}
                   onMouseUp={() => {
                     const selection = window.getSelection();
                     const text = selection?.toString() || "";
@@ -664,6 +741,7 @@ export default function PaperEdit() {
                     onChange={setOutline}
                     placeholder="请输入论文大纲..."
                     height={isFocusMode ? 820 : 700}
+                    className={cn(isFocusMode && "border-0 shadow-none")}
                   />
                 </div>
               </CardContent>
@@ -674,34 +752,40 @@ export default function PaperEdit() {
             <Card
               className={cn(isFocusMode && "border-0 shadow-none rounded-none")}
             >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>论文全文</CardTitle>
-                    <CardDescription>编辑论文的完整内容</CardDescription>
+              {!isFocusMode && (
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>论文全文</CardTitle>
+                      <CardDescription>编辑论文的完整内容</CardDescription>
+                    </div>
+                    <PolishToolbar
+                      selectedText={selectedText}
+                      onReplace={newText => {
+                        const textarea = document.querySelector(
+                          ".rc-md-editor textarea"
+                        ) as HTMLTextAreaElement;
+                        if (textarea && selectedText) {
+                          const start = textarea.selectionStart;
+                          const end = textarea.selectionEnd;
+                          const newValue =
+                            content.substring(0, start) +
+                            newText +
+                            content.substring(end);
+                          setContent(newValue);
+                          setSelectedText("");
+                        }
+                      }}
+                    />
                   </div>
-                  <PolishToolbar
-                    selectedText={selectedText}
-                    onReplace={newText => {
-                      const textarea = document.querySelector(
-                        ".rc-md-editor textarea"
-                      ) as HTMLTextAreaElement;
-                      if (textarea && selectedText) {
-                        const start = textarea.selectionStart;
-                        const end = textarea.selectionEnd;
-                        const newValue =
-                          content.substring(0, start) +
-                          newText +
-                          content.substring(end);
-                        setContent(newValue);
-                        setSelectedText("");
-                      }
-                    }}
-                  />
-                </div>
-              </CardHeader>
+                </CardHeader>
+              )}
               <CardContent className={cn(isFocusMode && "px-0 pb-0")}>
                 <div
+                  className={cn(
+                    "mx-auto w-full max-w-[1220px]",
+                    isFocusMode && "max-w-[960px] pb-6"
+                  )}
                   onMouseUp={() => {
                     const selection = window.getSelection();
                     const text = selection?.toString() || "";
@@ -716,6 +800,7 @@ export default function PaperEdit() {
                     onChange={setContent}
                     placeholder="请输入论文全文..."
                     height={isFocusMode ? 820 : 700}
+                    className={cn(isFocusMode && "border-0 shadow-none")}
                   />
                 </div>
               </CardContent>
