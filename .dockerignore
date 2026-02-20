@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.gitignore
+.vscode
+.idea
+*.log
+.npmrc
+.pnpm-store
+coverage
+.nyc_output
+.vitest
+.manus-logs
+.DS_Store
+.env
+.env.*
