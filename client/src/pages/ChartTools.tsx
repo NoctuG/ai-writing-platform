@@ -7,8 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
-import { BarChart3, Loader2, Plus, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { BarChart3, Loader2, Plus, Sparkles, Download, Trash2, Image as ImageIcon } from "lucide-react";
+import { useState, useRef } from "react";
+import html2canvas from "html2canvas";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
@@ -29,7 +30,8 @@ type ChartConfig = {
   description?: string;
 };
 
-function ChartPreview({ config }: { config: ChartConfig }) {
+function ChartPreview({ config, onExport }: { config: ChartConfig; onExport?: (chartId: number) => void }) {
+  const chartRef = useRef<HTMLDivElement>(null);
   const { chartType, data, xAxisKey, dataKeys, xAxisLabel, yAxisLabel, title } = config;
 
   const renderChart = () => {
@@ -115,11 +117,48 @@ function ChartPreview({ config }: { config: ChartConfig }) {
     }
   };
 
+  const handleExportPNG = async () => {
+    if (!chartRef.current) return;
+    try {
+      const canvas = await html2canvas(chartRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+      });
+      const url = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.png`;
+      link.href = url;
+      link.click();
+      toast.success('图表已导出为PNG');
+    } catch (error) {
+      toast.error('导出失败');
+      console.error(error);
+    }
+  };
+
+  const handleExportSVG = () => {
+    toast.info('SVG导出功能开发中');
+  };
+
   return (
-    <Card>
+    <Card ref={chartRef}>
       <CardHeader>
-        <CardTitle className="text-center">{title}</CardTitle>
-        {config.description && <CardDescription className="text-center">{config.description}</CardDescription>}
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <CardTitle className="text-center">{title}</CardTitle>
+            {config.description && <CardDescription className="text-center mt-2">{config.description}</CardDescription>}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportPNG}>
+              <Download className="h-4 w-4 mr-1" />
+              PNG
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportSVG}>
+              <ImageIcon className="h-4 w-4 mr-1" />
+              SVG
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
@@ -138,13 +177,29 @@ export default function ChartTools() {
   const [descriptionOnly, setDescriptionOnly] = useState("");
   const [selectedPaperId, setSelectedPaperId] = useState<number | null>(null);
   const [generatedChart, setGeneratedChart] = useState<ChartConfig | null>(null);
+  const [showChartList, setShowChartList] = useState(false);
 
   const { data: papers } = trpc.paper.list.useQuery(undefined, { enabled: isAuthenticated });
+  const { data: chartList, refetch: refetchCharts } = trpc.chart.list.useQuery(
+    { paperId: selectedPaperId! },
+    { enabled: isAuthenticated && selectedPaperId !== null && showChartList }
+  );
+
+  const deleteChartMutation = trpc.chart.delete.useMutation({
+    onSuccess: () => {
+      toast.success('图表已删除');
+      refetchCharts();
+    },
+    onError: (error) => {
+      toast.error(`删除失败: ${error.message}`);
+    },
+  });
 
   const generateFromCSVMutation = trpc.chart.generateFromCSV.useMutation({
     onSuccess: (data) => {
       toast.success("图表生成成功！");
       setGeneratedChart(data.config);
+      refetchCharts();
     },
     onError: (error) => {
       toast.error(`生成失败: ${error.message}`);
@@ -155,6 +210,7 @@ export default function ChartTools() {
     onSuccess: (data) => {
       toast.success("图表生成成功！");
       setGeneratedChart(data.config);
+      refetchCharts();
     },
     onError: (error) => {
       toast.error(`生成失败: ${error.message}`);
@@ -324,10 +380,69 @@ export default function ChartTools() {
           </TabsContent>
         </Tabs>
 
+        {/* Chart List */}
+        {selectedPaperId && (
+          <div className="mt-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">已生成的图表</h3>
+              <Button variant="outline" onClick={() => { setShowChartList(!showChartList); if (!showChartList) refetchCharts(); }}>
+                {showChartList ? '隐藏列表' : '查看列表'}
+              </Button>
+            </div>
+            {showChartList && chartList && chartList.length > 0 && (
+              <div className="grid gap-4">
+                {chartList.map((chart) => (
+                  <Card key={chart.id}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">{chart.title}</CardTitle>
+                          <CardDescription className="mt-1">
+                            {chart.chartType} · {new Date(chart.createdAt).toLocaleDateString()}
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteChartMutation.mutate({ id: chart.id })}
+                          disabled={deleteChartMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <ChartPreview
+                        config={{
+                          chartType: chart.chartType,
+                          title: chart.title,
+                          data: chart.dataSource,
+                          xAxisKey: chart.chartConfig.xAxisKey,
+                          dataKeys: chart.chartConfig.dataKeys,
+                          xAxisLabel: chart.chartConfig.xAxisLabel,
+                          yAxisLabel: chart.chartConfig.yAxisLabel,
+                          description: chart.description || undefined,
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+            {showChartList && chartList && chartList.length === 0 && (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  还没有生成任何图表
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         {/* Chart Preview */}
         {generatedChart && (
           <div className="mt-8">
-            <h3 className="text-xl font-semibold mb-4">生成结果</h3>
+            <h3 className="text-xl font-semibold mb-4">最新生成结果</h3>
             <ChartPreview config={generatedChart} />
           </div>
         )}

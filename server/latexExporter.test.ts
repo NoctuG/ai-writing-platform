@@ -1,0 +1,183 @@
+import { describe, it, expect } from 'vitest';
+import { generateLatexDocument, getTemplateDescriptions, type JournalTemplate } from './latexExporter';
+
+describe('LaTeX Exporter', () => {
+  describe('generateLatexDocument', () => {
+    it('should generate LaTeX document with generic template', () => {
+      const result = generateLatexDocument({
+        title: '测试论文',
+        type: 'journal',
+        content: '# 引言\n\n这是引言内容。\n\n## 研究背景\n\n背景描述。',
+        template: 'generic',
+      });
+
+      expect(result).toContain('\\documentclass[12pt,a4paper]{article}');
+      expect(result).toContain('\\title{测试论文}');
+      expect(result).toContain('\\section{引言}');
+      expect(result).toContain('\\subsection{研究背景}');
+    });
+
+    it('should generate LaTeX document with IEEE template', () => {
+      const result = generateLatexDocument({
+        title: 'Test Paper',
+        type: 'journal',
+        content: '# Introduction\n\nContent here.',
+        template: 'ieee',
+      });
+
+      expect(result).toContain('\\documentclass[conference]{IEEEtran}');
+      expect(result).toContain('\\title{Test Paper}');
+      expect(result).toContain('\\section{Introduction}');
+    });
+
+    it('should include authors when provided', () => {
+      const result = generateLatexDocument({
+        title: '测试论文',
+        type: 'journal',
+        content: '# 引言',
+        template: 'generic',
+        authors: ['张三', '李四'],
+      });
+
+      expect(result).toContain('\\author{张三 \\and 李四}');
+    });
+
+    it('should include abstract when provided', () => {
+      const result = generateLatexDocument({
+        title: '测试论文',
+        type: 'journal',
+        content: '# 引言',
+        template: 'generic',
+        abstract: '这是摘要内容',
+      });
+
+      expect(result).toContain('\\begin{abstract}');
+      expect(result).toContain('这是摘要内容');
+      expect(result).toContain('\\end{abstract}');
+    });
+
+    it('should include keywords when provided', () => {
+      const result = generateLatexDocument({
+        title: '测试论文',
+        type: 'journal',
+        content: '# 引言',
+        template: 'generic',
+        keywords: ['机器学习', '深度学习', '神经网络'],
+      });
+
+      expect(result).toContain('关键词');
+      expect(result).toContain('机器学习');
+      expect(result).toContain('深度学习');
+      expect(result).toContain('神经网络');
+    });
+
+    it('should convert markdown bold to LaTeX textbf', () => {
+      const result = generateLatexDocument({
+        title: '测试',
+        type: 'journal',
+        content: '这是**加粗文本**。',
+        template: 'generic',
+      });
+
+      expect(result).toContain('\\textbf{加粗文本}');
+    });
+
+    it('should convert markdown italic to LaTeX textit', () => {
+      const result = generateLatexDocument({
+        title: '测试',
+        type: 'journal',
+        content: '这是*斜体文本*。',
+        template: 'generic',
+      });
+
+      expect(result).toContain('\\textit{斜体文本}');
+    });
+
+    it('should convert markdown code to LaTeX texttt', () => {
+      const result = generateLatexDocument({
+        title: '测试',
+        type: 'journal',
+        content: '这是`代码`。',
+        template: 'generic',
+      });
+
+      expect(result).toContain('\\texttt{代码}');
+    });
+
+    it('should convert markdown citations to LaTeX cite', () => {
+      const result = generateLatexDocument({
+        title: '测试',
+        type: 'journal',
+        content: '根据研究[1]，结果显示[2]。',
+        template: 'generic',
+      });
+
+      expect(result).toContain('\\cite{ref1}');
+      expect(result).toContain('\\cite{ref2}');
+    });
+
+    it('should handle Elsevier template with special author format', () => {
+      const result = generateLatexDocument({
+        title: 'Test',
+        type: 'journal',
+        content: '# Introduction',
+        template: 'elsevier',
+        authors: ['Author One', 'Author Two'],
+      });
+
+      expect(result).toContain('\\documentclass[preprint,12pt]{elsarticle}');
+      expect(result).toContain('\\author{Author One}');
+      expect(result).toContain('\\author{Author Two}');
+    });
+
+    it('should handle Nature template with double spacing', () => {
+      const result = generateLatexDocument({
+        title: 'Test',
+        type: 'journal',
+        content: '# Introduction',
+        template: 'nature',
+      });
+
+      expect(result).toContain('\\doublespacing');
+      expect(result).toContain('naturemag');
+    });
+
+    it('should handle Springer template', () => {
+      const result = generateLatexDocument({
+        title: 'Test',
+        type: 'journal',
+        content: '# Introduction',
+        template: 'springer',
+      });
+
+      expect(result).toContain('\\documentclass[smallextended]{svjour3}');
+    });
+  });
+
+  describe('getTemplateDescriptions', () => {
+    it('should return all template descriptions', () => {
+      const templates = getTemplateDescriptions();
+
+      expect(templates).toHaveLength(5);
+      expect(templates.map(t => t.id)).toEqual(['generic', 'ieee', 'nature', 'elsevier', 'springer']);
+    });
+
+    it('should include name and description for each template', () => {
+      const templates = getTemplateDescriptions();
+
+      templates.forEach(template => {
+        expect(template.id).toBeTruthy();
+        expect(template.name).toBeTruthy();
+        expect(template.description).toBeTruthy();
+      });
+    });
+
+    it('should have Chinese descriptions', () => {
+      const templates = getTemplateDescriptions();
+      const genericTemplate = templates.find(t => t.id === 'generic');
+
+      expect(genericTemplate?.name).toBe('通用模板');
+      expect(genericTemplate?.description).toContain('学术论文');
+    });
+  });
+});

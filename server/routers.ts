@@ -1185,6 +1185,61 @@ export const appRouter = router({
     }),
   }),
 
+  // LaTeX Export
+  latex: router({ 
+    export: protectedProcedure
+      .input(z.object({
+        paperId: z.number(),
+        template: z.enum(["generic", "ieee", "nature", "elsevier", "springer"]).default("generic"),
+        authors: z.array(z.string()).optional(),
+        abstract: z.string().optional(),
+        keywords: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const paper = await getPaperById(input.paperId);
+          if (!paper) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
+          }
+          if (paper.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "无权导出此论文" });
+          }
+
+          const latestVersion = await getPaperVersionsByPaperId(input.paperId);
+          const content = latestVersion[0]?.fullContent || paper.fullContent || "";
+          const outline = latestVersion[0]?.outline || paper.outline || "";
+
+          const latexContent = generateLatexDocument({
+            title: paper.title,
+            type: paper.type,
+            content,
+            outline,
+            template: input.template as JournalTemplate,
+            authors: input.authors,
+            abstract: input.abstract,
+            keywords: input.keywords,
+          });
+
+          // Upload to S3
+          const fileName = `${paper.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.tex`;
+          const { url, key } = await storagePut(
+            `latex/${ctx.user.id}/${Date.now()}_${fileName}`,
+            Buffer.from(latexContent, 'utf-8'),
+            'application/x-tex'
+          );
+
+          return { url, fileName, latexContent };
+        } catch (error: any) {
+          console.error("[LaTeX Export] Error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "导出失败" });
+        }
+      }),
+
+    getTemplates: publicProcedure.query(() => {
+      return getTemplateDescriptions();
+    }),
+  }),
+
   dashboard: router({
     getStatistics: protectedProcedure.query(async ({ ctx }) => {
       try {

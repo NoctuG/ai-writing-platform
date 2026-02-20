@@ -42,6 +42,8 @@ export default function PaperEdit() {
   const [showVersions, setShowVersions] = useState(false);
   const [showQualityCheck, setShowQualityCheck] = useState(false);
   const [selectedText, setSelectedText] = useState("");
+  const [showLatexDialog, setShowLatexDialog] = useState(false);
+  const [latexTemplate, setLatexTemplate] = useState<"generic" | "ieee" | "nature" | "elsevier" | "springer">("generic");
   const utils = trpc.useUtils();
 
   const { data: paper, isLoading } = trpc.paper.getById.useQuery(
@@ -115,11 +117,18 @@ export default function PaperEdit() {
     },
   });
 
-  const exportLatexMutation = trpc.paper.exportLatex.useMutation({
+  const { data: latexTemplates } = trpc.latex.getTemplates.useQuery();
+
+  const exportLatexMutation = trpc.latex.export.useMutation({
     onSuccess: (data) => {
       toast.success("导出LaTeX成功！");
-      if (data.fileUrl) {
-        window.open(data.fileUrl, "_blank");
+      setShowLatexDialog(false);
+      if (data.url) {
+        // Download the .tex file
+        const link = document.createElement('a');
+        link.href = data.url;
+        link.download = data.fileName;
+        link.click();
       }
     },
     onError: (error) => {
@@ -338,23 +347,57 @@ export default function PaperEdit() {
                   </>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => exportLatexMutation.mutate({ id: paperId, template: "generic" })}
-                disabled={exportLatexMutation.isPending}
-              >
-                {exportLatexMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    导出中...
-                  </>
-                ) : (
-                  <>
+              <Dialog open={showLatexDialog} onOpenChange={setShowLatexDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
                     <FileCode className="mr-2 h-4 w-4" />
                     导出LaTeX
-                  </>
-                )}
-              </Button>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>选择LaTeX模板</DialogTitle>
+                    <DialogDescription>
+                      选择适合您目标期刊的LaTeX模板
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      {latexTemplates?.map((template) => (
+                        <div
+                          key={template.id}
+                          className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                            latexTemplate === template.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                          onClick={() => setLatexTemplate(template.id)}
+                        >
+                          <div className="font-semibold">{template.name}</div>
+                          <div className="text-sm text-muted-foreground mt-1">{template.description}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => exportLatexMutation.mutate({ paperId, template: latexTemplate })}
+                      disabled={exportLatexMutation.isPending}
+                    >
+                      {exportLatexMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          导出中...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-4 w-4" />
+                          确认导出
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
