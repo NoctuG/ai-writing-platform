@@ -75,6 +75,7 @@ import {
   type TranslationDomain,
 } from "./translator";
 import { storagePut } from "./storage";
+import { searchPapers } from "./semanticScholar";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -88,6 +89,23 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+  }),
+
+  scholar: router({
+    searchPapers: protectedProcedure
+      .input(
+        z.object({
+          query: z.string().min(1, "搜索关键词不能为空"),
+          limit: z.number().int().min(1).max(100).default(10),
+          offset: z.number().int().min(0).default(0),
+          year: z.string().trim().optional(),
+          fields_of_study: z.string().trim().optional(),
+          open_access_only: z.boolean().optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        return searchPapers(input);
+      }),
   }),
 
   paper: router({
