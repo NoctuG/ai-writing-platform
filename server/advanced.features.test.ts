@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatReference, type ReferenceData } from "./referenceFormatter";
+import {
+  formatGBT7714,
+  formatReference,
+  type ReferenceData,
+} from "./referenceFormatter";
 import type { TrpcContext } from "./_core/context";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -37,6 +41,7 @@ describe("Reference Formatter", () => {
     issue: "3",
     pages: "123-130",
     doi: "10.1234/cs.2023.03.001",
+    documentType: "journal",
   };
 
   it("should format reference in GB/T 7714 style", () => {
@@ -47,6 +52,46 @@ describe("Reference Formatter", () => {
     expect(formatted).toContain("2023");
     expect(formatted).toContain("50(3)");
     expect(formatted).toContain("123-130");
+  });
+
+  it("should map document type to GB/T 7714 code", () => {
+    const bookRef: ReferenceData = {
+      ...sampleRef,
+      title: "机器学习导论",
+      documentType: "book",
+    };
+    const thesisRef: ReferenceData = {
+      ...sampleRef,
+      title: "知识图谱问答系统研究",
+      documentType: "thesis",
+    };
+    const webRef: ReferenceData = {
+      ...sampleRef,
+      title: "开放数据平台资源",
+      documentType: "web",
+    };
+
+    expect(formatReference(bookRef, "gbt7714")).toContain("机器学习导论[M]");
+    expect(formatReference(thesisRef, "gbt7714")).toContain(
+      "知识图谱问答系统研究[D]"
+    );
+    expect(formatReference(webRef, "gbt7714")).toContain(
+      "开放数据平台资源[EB/OL]"
+    );
+  });
+
+  it("should support configurable GB/T 7714 fallback document type", () => {
+    const noTypeRef: ReferenceData = {
+      title: "默认类型回退测试",
+      authors: ["测试作者"],
+      year: 2024,
+    };
+
+    const formatted = formatGBT7714(noTypeRef, {
+      fallbackDocumentTypeCode: "M",
+    });
+
+    expect(formatted).toContain("默认类型回退测试[M]");
   });
 
   it("should format reference in APA style", () => {

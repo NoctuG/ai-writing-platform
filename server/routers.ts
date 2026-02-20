@@ -83,12 +83,24 @@ import {
 import { storagePut } from "./storage";
 import { searchPapers } from "./semanticScholar";
 
+const referenceDocumentTypeEnum = z.enum([
+  "journal",
+  "book",
+  "thesis",
+  "conference",
+  "report",
+  "standard",
+  "patent",
+  "web",
+]);
+
 const GRADUATION_STRUCTURE_ORDER = PAPER_STRUCTURE_MODULES.map(
   module => paperStructureModuleLabels[module]
 );
 
 const extractChineseAbstractSection = (content: string): string => {
-  const headingRegex = /(?:^|\n)##\s*中文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
+  const headingRegex =
+    /(?:^|\n)##\s*中文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
   const match = content.match(headingRegex);
   return match?.[1]?.trim() ?? "";
 };
@@ -98,13 +110,15 @@ const upsertEnglishAbstractSection = (
   translatedText: string
 ): string => {
   const englishSection = `## 英文摘要与关键词\n${translatedText.trim()}\n`;
-  const sectionRegex = /(?:^|\n)##\s*英文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
+  const sectionRegex =
+    /(?:^|\n)##\s*英文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
 
   if (sectionRegex.test(content)) {
     return content.replace(sectionRegex, `\n${englishSection}`);
   }
 
-  const anchorRegex = /(?:^|\n)##\s*中文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
+  const anchorRegex =
+    /(?:^|\n)##\s*中文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
   const anchorMatch = content.match(anchorRegex);
   if (!anchorMatch || anchorMatch.index === undefined) {
     return `${content.trim()}\n\n${englishSection}`;
@@ -814,6 +828,20 @@ export const appRouter = router({
                           pages: { type: "string", description: "页码" },
                           doi: { type: "string", description: "DOI" },
                           url: { type: "string", description: "文献链接" },
+                          documentType: {
+                            type: "string",
+                            description: "文献类型",
+                            enum: [
+                              "journal",
+                              "book",
+                              "thesis",
+                              "conference",
+                              "report",
+                              "standard",
+                              "patent",
+                              "web",
+                            ],
+                          },
                         },
                         required: ["title", "authors", "year", "journal"],
                         additionalProperties: false,
@@ -856,6 +884,7 @@ export const appRouter = router({
           pages: z.string().optional(),
           doi: z.string().optional(),
           url: z.string().optional(),
+          documentType: referenceDocumentTypeEnum.optional().default("journal"),
           citationFormat: z
             .enum(["gbt7714", "apa", "mla", "chicago"])
             .default("gbt7714"),
@@ -872,6 +901,7 @@ export const appRouter = router({
           pages: input.pages,
           doi: input.doi,
           url: input.url,
+          documentType: input.documentType,
         };
 
         const formattedCitation = formatReference(
@@ -890,6 +920,7 @@ export const appRouter = router({
           pages: input.pages,
           doi: input.doi,
           url: input.url,
+          documentType: input.documentType,
           citationFormat: input.citationFormat,
           formattedCitation,
         });
@@ -938,6 +969,7 @@ export const appRouter = router({
           pages: ref.pages || undefined,
           doi: ref.doi || undefined,
           url: ref.url || undefined,
+          documentType: ref.documentType || undefined,
         };
 
         const formattedCitation = formatReference(

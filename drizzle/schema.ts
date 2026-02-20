@@ -1,4 +1,11 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -19,7 +26,12 @@ export const users = mysqlTable("users", {
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }), // Stripe customer ID
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Active subscription ID
-  subscriptionStatus: mysqlEnum("subscriptionStatus", ["none", "active", "canceled", "past_due"]).default("none"),
+  subscriptionStatus: mysqlEnum("subscriptionStatus", [
+    "none",
+    "active",
+    "canceled",
+    "past_due",
+  ]).default("none"),
   subscriptionEndDate: timestamp("subscriptionEndDate"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -34,10 +46,19 @@ export type InsertUser = typeof users.$inferInsert;
  */
 export const papers = mysqlTable("papers", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  type: mysqlEnum("type", ["graduation", "journal", "proposal", "professional"]).notNull(),
-  status: mysqlEnum("status", ["generating", "completed", "failed"]).default("generating").notNull(),
+  type: mysqlEnum("type", [
+    "graduation",
+    "journal",
+    "proposal",
+    "professional",
+  ]).notNull(),
+  status: mysqlEnum("status", ["generating", "completed", "failed"])
+    .default("generating")
+    .notNull(),
   outline: text("outline"),
   content: text("content"),
   wordFileKey: text("wordFileKey"),
@@ -60,7 +81,9 @@ export type InsertPaper = typeof papers.$inferInsert;
  */
 export const paperVersions = mysqlTable("paperVersions", {
   id: int("id").autoincrement().primaryKey(),
-  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  paperId: int("paperId")
+    .notNull()
+    .references(() => papers.id, { onDelete: "cascade" }),
   versionNumber: int("versionNumber").notNull(),
   outline: text("outline"),
   content: text("content"),
@@ -76,7 +99,9 @@ export type InsertPaperVersion = typeof paperVersions.$inferInsert;
  */
 export const references = mysqlTable("references", {
   id: int("id").autoincrement().primaryKey(),
-  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  paperId: int("paperId")
+    .notNull()
+    .references(() => papers.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   authors: text("authors").notNull(), // JSON array of author names
   year: int("year"),
@@ -86,7 +111,26 @@ export const references = mysqlTable("references", {
   pages: varchar("pages", { length: 50 }),
   doi: varchar("doi", { length: 255 }),
   url: text("url"),
-  citationFormat: mysqlEnum("citationFormat", ["gbt7714", "apa", "mla", "chicago"]).default("gbt7714").notNull(),
+  documentType: mysqlEnum("documentType", [
+    "journal",
+    "book",
+    "thesis",
+    "conference",
+    "report",
+    "standard",
+    "patent",
+    "web",
+  ])
+    .default("journal")
+    .notNull(),
+  citationFormat: mysqlEnum("citationFormat", [
+    "gbt7714",
+    "apa",
+    "mla",
+    "chicago",
+  ])
+    .default("gbt7714")
+    .notNull(),
   formattedCitation: text("formattedCitation"), // Pre-formatted citation string
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -99,7 +143,9 @@ export type InsertReference = typeof references.$inferInsert;
  */
 export const qualityChecks = mysqlTable("qualityChecks", {
   id: int("id").autoincrement().primaryKey(),
-  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  paperId: int("paperId")
+    .notNull()
+    .references(() => papers.id, { onDelete: "cascade" }),
   overallScore: int("overallScore").notNull(), // 0-100
   plagiarismScore: int("plagiarismScore"), // 0-100, higher means more plagiarism
   grammarScore: int("grammarScore"), // 0-100
@@ -118,10 +164,17 @@ export type InsertQualityCheck = typeof qualityChecks.$inferInsert;
  */
 export const polishHistory = mysqlTable("polishHistory", {
   id: int("id").autoincrement().primaryKey(),
-  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  paperId: int("paperId")
+    .notNull()
+    .references(() => papers.id, { onDelete: "cascade" }),
   originalText: text("originalText").notNull(),
   polishedText: text("polishedText").notNull(),
-  polishType: mysqlEnum("polishType", ["expression", "grammar", "academic", "comprehensive"]).notNull(),
+  polishType: mysqlEnum("polishType", [
+    "expression",
+    "grammar",
+    "academic",
+    "comprehensive",
+  ]).notNull(),
   suggestions: text("suggestions"), // JSON array of alternative suggestions
   applied: int("applied").default(0).notNull(), // 0 = not applied, 1 = applied
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -135,8 +188,10 @@ export type InsertPolishHistory = typeof polishHistory.$inferInsert;
  */
 export const knowledgeDocuments = mysqlTable("knowledgeDocuments", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
-  paperId: int("paperId").references(() => papers.id, { onDelete: 'cascade' }),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  paperId: int("paperId").references(() => papers.id, { onDelete: "cascade" }),
   fileName: text("fileName").notNull(),
   fileKey: text("fileKey").notNull(),
   fileUrl: text("fileUrl").notNull(),
@@ -145,7 +200,9 @@ export const knowledgeDocuments = mysqlTable("knowledgeDocuments", {
   extractedText: text("extractedText"),
   summary: text("summary"),
   metadata: text("metadata"), // JSON: { pageCount, authors, title, abstract, keywords }
-  status: mysqlEnum("status", ["uploading", "processing", "ready", "failed"]).default("uploading").notNull(),
+  status: mysqlEnum("status", ["uploading", "processing", "ready", "failed"])
+    .default("uploading")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -158,10 +215,21 @@ export type InsertKnowledgeDocument = typeof knowledgeDocuments.$inferInsert;
  */
 export const charts = mysqlTable("charts", {
   id: int("id").autoincrement().primaryKey(),
-  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  paperId: int("paperId")
+    .notNull()
+    .references(() => papers.id, { onDelete: "cascade" }),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  chartType: mysqlEnum("chartType", ["line", "bar", "scatter", "pie", "radar", "area"]).notNull(),
+  chartType: mysqlEnum("chartType", [
+    "line",
+    "bar",
+    "scatter",
+    "pie",
+    "radar",
+    "area",
+  ]).notNull(),
   dataSource: text("dataSource").notNull(), // JSON: raw data array
   chartConfig: text("chartConfig").notNull(), // JSON: recharts config
   description: text("description"),
@@ -178,7 +246,9 @@ export type InsertChart = typeof charts.$inferInsert;
  */
 export const folders = mysqlTable("folders", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   parentId: int("parentId"),
   color: varchar("color", { length: 20 }),
@@ -194,7 +264,9 @@ export type InsertFolder = typeof folders.$inferInsert;
  */
 export const paperTags = mysqlTable("paperTags", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 100 }).notNull(),
   color: varchar("color", { length: 20 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -208,20 +280,27 @@ export type InsertPaperTag = typeof paperTags.$inferInsert;
  */
 export const paperTagAssociations = mysqlTable("paperTagAssociations", {
   id: int("id").autoincrement().primaryKey(),
-  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
-  tagId: int("tagId").notNull().references(() => paperTags.id, { onDelete: 'cascade' }),
+  paperId: int("paperId")
+    .notNull()
+    .references(() => papers.id, { onDelete: "cascade" }),
+  tagId: int("tagId")
+    .notNull()
+    .references(() => paperTags.id, { onDelete: "cascade" }),
 });
 
 export type PaperTagAssociation = typeof paperTagAssociations.$inferSelect;
-export type InsertPaperTagAssociation = typeof paperTagAssociations.$inferInsert;
+export type InsertPaperTagAssociation =
+  typeof paperTagAssociations.$inferInsert;
 
 /**
  * Translation history table
  */
 export const translations = mysqlTable("translations", {
   id: int("id").autoincrement().primaryKey(),
-  paperId: int("paperId").references(() => papers.id, { onDelete: 'cascade' }),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  paperId: int("paperId").references(() => papers.id, { onDelete: "cascade" }),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   sourceText: text("sourceText").notNull(),
   translatedText: text("translatedText").notNull(),
   sourceLang: varchar("sourceLang", { length: 10 }).notNull(),

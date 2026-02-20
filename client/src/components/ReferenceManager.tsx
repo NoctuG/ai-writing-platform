@@ -1,5 +1,11 @@
 import { Button } from "@/components/fluent/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/fluent/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/fluent/card";
 import { Input } from "@/components/fluent/input";
 import { Label } from "@/components/fluent/label";
 import {
@@ -34,19 +40,43 @@ const citationFormatLabels: Record<string, string> = {
   chicago: "Chicago",
 };
 
+const documentTypeLabels: Record<string, string> = {
+  journal: "期刊",
+  book: "图书",
+  thesis: "学位论文",
+  conference: "会议论文",
+  report: "报告",
+  standard: "标准",
+  patent: "专利",
+  web: "网络文献",
+};
+
+const documentTypeCodeMap: Record<string, string> = {
+  journal: "J",
+  book: "M",
+  thesis: "D",
+  conference: "C",
+  report: "R",
+  standard: "S",
+  patent: "P",
+  web: "EB/OL",
+};
+
 export default function ReferenceManager({ paperId }: ReferenceManagerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFormat, setSelectedFormat] = useState<string>("gbt7714");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const utils = trpc.useUtils();
 
-  const { data: references, isLoading } = trpc.reference.list.useQuery({ paperId });
+  const { data: references, isLoading } = trpc.reference.list.useQuery({
+    paperId,
+  });
 
   const searchMutation = trpc.reference.search.useMutation({
     onSuccess: () => {
       toast.success("文献搜索成功");
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(`搜索失败: ${error.message}`);
     },
   });
@@ -57,7 +87,7 @@ export default function ReferenceManager({ paperId }: ReferenceManagerProps) {
       toast.success("文献添加成功");
       setShowAddDialog(false);
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(`添加失败: ${error.message}`);
     },
   });
@@ -67,7 +97,7 @@ export default function ReferenceManager({ paperId }: ReferenceManagerProps) {
       utils.reference.list.invalidate({ paperId });
       toast.success("文献删除成功");
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(`删除失败: ${error.message}`);
     },
   });
@@ -82,15 +112,24 @@ export default function ReferenceManager({ paperId }: ReferenceManagerProps) {
 
   const handleCopyFormatted = async (ref: any) => {
     try {
-      // 使用本地格式化逻辑
-      const authors = ref.authors.split(",").map((a: string) => a.trim());
+      const authors = Array.isArray(ref.authors)
+        ? ref.authors
+        : String(ref.authors || "")
+            .split(",")
+            .map((a: string) => a.trim())
+            .filter(Boolean);
       let formatted = "";
 
       if (selectedFormat === "gbt7714") {
-        const authorStr = authors.length > 3 ? `${authors.slice(0, 3).join(", ")}, 等` : authors.join(", ");
-        formatted = `${authorStr}. ${ref.title}[J]. `;
+        const authorStr =
+          authors.length > 3
+            ? `${authors.slice(0, 3).join(", ")}, 等`
+            : authors.join(", ");
+        const documentCode =
+          documentTypeCodeMap[ref.documentType || "journal"] || "J";
+        formatted = `${authorStr}. ${ref.title}[${documentCode}]. `;
         if (ref.journal) formatted += `${ref.journal}, `;
-        formatted += `${ref.year}`;
+        if (ref.year) formatted += `${ref.year}`;
         if (ref.volume) formatted += `, ${ref.volume}`;
         if (ref.issue) formatted += `(${ref.issue})`;
         if (ref.pages) formatted += `: ${ref.pages}`;
@@ -127,8 +166,8 @@ export default function ReferenceManager({ paperId }: ReferenceManagerProps) {
             <Input
               placeholder="搜索学术文献..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSearch()}
             />
             <Button onClick={handleSearch} disabled={searchMutation.isPending}>
               {searchMutation.isPending ? (
@@ -171,7 +210,7 @@ export default function ReferenceManager({ paperId }: ReferenceManagerProps) {
               </DialogHeader>
               <AddReferenceForm
                 paperId={paperId}
-                onAdd={(data) => addMutation.mutate(data)}
+                onAdd={data => addMutation.mutate(data)}
                 isPending={addMutation.isPending}
               />
             </DialogContent>
@@ -187,13 +226,20 @@ export default function ReferenceManager({ paperId }: ReferenceManagerProps) {
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : references && references.length > 0 ? (
-            references.map((ref) => (
-              <Card key={ref.id} className="hover:bg-accent/50 transition-colors">
+            references.map(ref => (
+              <Card
+                key={ref.id}
+                className="hover:bg-accent/50 transition-colors"
+              >
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">{ref.title}</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    {ref.title}
+                  </CardTitle>
                   <CardDescription className="text-xs">
                     {ref.authors} • {ref.year}
                     {ref.journal && ` • ${ref.journal}`}
+                    {ref.documentType &&
+                      ` • ${documentTypeLabels[ref.documentType] || ref.documentType}`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -222,7 +268,9 @@ export default function ReferenceManager({ paperId }: ReferenceManagerProps) {
           ) : (
             <div className="text-center py-12">
               <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">还没有添加参考文献</p>
+              <p className="text-sm text-muted-foreground">
+                还没有添加参考文献
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
                 搜索或手动添加文献以开始
               </p>
@@ -240,7 +288,11 @@ interface AddReferenceFormProps {
   isPending: boolean;
 }
 
-function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) {
+function AddReferenceForm({
+  paperId,
+  onAdd,
+  isPending,
+}: AddReferenceFormProps) {
   const [formData, setFormData] = useState({
     title: "",
     authors: "",
@@ -250,6 +302,7 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
     issue: "",
     pages: "",
     doi: "",
+    documentType: "journal",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -264,6 +317,7 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
       issue: formData.issue || undefined,
       pages: formData.pages || undefined,
       doi: formData.doi || undefined,
+      documentType: formData.documentType,
     });
   };
 
@@ -275,7 +329,7 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
           <Input
             id="title"
             value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onChange={e => setFormData({ ...formData, title: e.target.value })}
             required
           />
         </div>
@@ -286,7 +340,9 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
             id="authors"
             placeholder="多个作者用逗号分隔"
             value={formData.authors}
-            onChange={(e) => setFormData({ ...formData, authors: e.target.value })}
+            onChange={e =>
+              setFormData({ ...formData, authors: e.target.value })
+            }
             required
           />
         </div>
@@ -297,9 +353,32 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
             id="year"
             type="number"
             value={formData.year}
-            onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
+            onChange={e =>
+              setFormData({ ...formData, year: parseInt(e.target.value) })
+            }
             required
           />
+        </div>
+
+        <div>
+          <Label htmlFor="documentType">文献类型</Label>
+          <Select
+            value={formData.documentType}
+            onValueChange={value =>
+              setFormData({ ...formData, documentType: value })
+            }
+          >
+            <SelectTrigger id="documentType">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(documentTypeLabels).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
@@ -307,7 +386,9 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
           <Input
             id="journal"
             value={formData.journal}
-            onChange={(e) => setFormData({ ...formData, journal: e.target.value })}
+            onChange={e =>
+              setFormData({ ...formData, journal: e.target.value })
+            }
           />
         </div>
 
@@ -316,7 +397,7 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
           <Input
             id="volume"
             value={formData.volume}
-            onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
+            onChange={e => setFormData({ ...formData, volume: e.target.value })}
           />
         </div>
 
@@ -325,7 +406,7 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
           <Input
             id="issue"
             value={formData.issue}
-            onChange={(e) => setFormData({ ...formData, issue: e.target.value })}
+            onChange={e => setFormData({ ...formData, issue: e.target.value })}
           />
         </div>
 
@@ -335,7 +416,7 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
             id="pages"
             placeholder="例如: 123-130"
             value={formData.pages}
-            onChange={(e) => setFormData({ ...formData, pages: e.target.value })}
+            onChange={e => setFormData({ ...formData, pages: e.target.value })}
           />
         </div>
 
@@ -344,7 +425,7 @@ function AddReferenceForm({ paperId, onAdd, isPending }: AddReferenceFormProps) 
           <Input
             id="doi"
             value={formData.doi}
-            onChange={(e) => setFormData({ ...formData, doi: e.target.value })}
+            onChange={e => setFormData({ ...formData, doi: e.target.value })}
           />
         </div>
       </div>

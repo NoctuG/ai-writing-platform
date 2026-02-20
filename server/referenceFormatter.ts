@@ -6,6 +6,15 @@
 export interface ReferenceData {
   title: string;
   authors: string[]; // 作者列表
+  documentType?:
+    | "journal"
+    | "book"
+    | "thesis"
+    | "conference"
+    | "report"
+    | "standard"
+    | "patent"
+    | "web";
   year?: number;
   journal?: string;
   volume?: string;
@@ -19,8 +28,33 @@ export interface ReferenceData {
  * GB/T 7714格式（中国国家标准）
  * 格式：作者. 文献题名[J]. 刊名, 出版年份, 卷号(期号): 页码.
  */
-export function formatGBT7714(ref: ReferenceData): string {
+const gbt7714DocumentTypeCodeMap = {
+  journal: "J",
+  book: "M",
+  thesis: "D",
+  conference: "C",
+  report: "R",
+  standard: "S",
+  patent: "P",
+  web: "EB/OL",
+} as const;
+
+type Gbt7714DocumentCode =
+  (typeof gbt7714DocumentTypeCodeMap)[keyof typeof gbt7714DocumentTypeCodeMap];
+
+interface FormatGBT7714Options {
+  fallbackDocumentTypeCode?: Gbt7714DocumentCode;
+}
+
+export function formatGBT7714(
+  ref: ReferenceData,
+  options: FormatGBT7714Options = {}
+): string {
   const parts: string[] = [];
+  const fallbackDocumentTypeCode = options.fallbackDocumentTypeCode ?? "J";
+  const documentTypeCode = ref.documentType
+    ? gbt7714DocumentTypeCodeMap[ref.documentType]
+    : fallbackDocumentTypeCode;
 
   // 作者
   if (ref.authors.length > 0) {
@@ -32,7 +66,7 @@ export function formatGBT7714(ref: ReferenceData): string {
   }
 
   // 标题
-  parts.push(`${ref.title}[J]`);
+  parts.push(`${ref.title}[${documentTypeCode}]`);
 
   // 期刊、年份、卷期、页码
   const journalParts: string[] = [];
