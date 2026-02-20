@@ -52,6 +52,7 @@ pnpm start
 | `OAUTH_SERVER_URL`      | OAuth 服务地址                       | 使用 OAuth 时必配 |
 | `VITE_APP_ID`           | 前端应用标识                         | 使用 OAuth 时建议 |
 | `VITE_OAUTH_PORTAL_URL` | OAuth 门户地址                       | 使用 OAuth 时建议 |
+| `AI4SCHOLAR_API_KEY`    | Ai4Scholar / Semantic Scholar API Key   | 使用文献检索时必配 |
 
 ### Vercel（最小步骤）
 
@@ -85,3 +86,23 @@ docker run --rm -p 3000:3000 \
 - **端口启动失败**：生产环境必须显式设置合法 `PORT`；开发环境默认尝试 `3000` 并自动找可用端口。
 - **数据库连接失败**：确认 `DATABASE_URL` 格式正确、数据库可访问，且已执行 `pnpm db:push`。
 - **OAuth 登录后回调异常**：确认回调地址为 `https://你的域名/api/oauth/callback`（本地为 `http://localhost:3000/api/oauth/callback`），并与 OAuth 平台配置一致。
+
+
+## Semantic Scholar（Ai4Scholar 代理）接入
+
+后端已提供 tRPC 接口 `scholar.searchPapers`，用于论文相关性搜索（对应 `GET /graph/v1/paper/search`）。
+
+### 入参
+
+- `query`：搜索关键词（必填）
+- `limit`：返回数量，`1-100`，默认 `10`
+- `offset`：分页偏移量，默认 `0`
+- `year`：年份过滤（如 `2020-2024`）
+- `fields_of_study`：学科过滤（如 `Computer Science`）
+- `open_access_only`：是否只返回开放获取论文
+
+### 使用说明
+
+1. 在环境变量中配置 `AI4SCHOLAR_API_KEY`。
+2. 通过后端 `scholar.searchPapers` 统一调用，后端会自动在请求头添加 `x-api-key`。
+3. 若未配置密钥，接口会返回预置条件错误；若上游 API 异常，会返回网关错误并携带状态码。
