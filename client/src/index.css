@@ -44,6 +44,17 @@
 }
 
 :root {
+  --font-sans-zh:
+    "Noto Sans SC",
+    "Source Han Sans SC",
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "WenQuanYi Micro Hei",
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+
   /* Elegant purple and gold theme */
   --primary: oklch(0.55 0.18 290);
   --primary-foreground: oklch(1 0 0);
@@ -121,6 +132,17 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans-zh);
+    line-height: 1.7;
+    letter-spacing: 0.01em;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    text-rendering: optimizeLegibility;
+  }
+
+  :where(h1, h2, h3, h4, h5, h6, p, li, label, input, textarea, select, button, table, th, td) {
+    font-family: inherit;
+    line-height: inherit;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -182,15 +204,10 @@
 
     font-size: 1.02rem;
     line-height: 1.7;
-    font-family:
-      "Noto Serif SC",
-      "Source Han Serif SC",
-      "Songti SC",
-      "STSong",
-      "SimSun",
-      "PMingLiU",
-      serif;
+    font-family: var(--font-sans-zh);
     letter-spacing: 0.01em;
+    word-break: break-word;
+    text-rendering: optimizeLegibility;
   }
 
   .prose-thesis :where(p):not(:where([class~="not-prose"] *)) {
