@@ -58,6 +58,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/fluent/sheet";
+import FluentEmptyState, { createEmptyStateCopy } from "@/components/FluentEmptyState";
 
 const paperTypeNames = {
   graduation: "毕业论文",
@@ -656,9 +657,24 @@ export default function PaperEdit() {
                   </DialogHeader>
                   <div className="space-y-3">
                     {!chartList || chartList.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        当前论文暂无可用图表，请先在图表工具中生成图表。
-                      </p>
+                      <FluentEmptyState
+                        icon={FileCode}
+                        title="当前论文暂无可用图表"
+                        copy={createEmptyStateCopy({
+                          reason: "图表库中还没有与本论文关联的数据可视化内容。",
+                          nextStep: "前往图表工具创建图表并保存，随后即可一键插入当前文稿。",
+                          actionLabel: "去图表工具",
+                        })}
+                        primaryAction={{
+                          label: "去图表工具",
+                          onClick: () => {
+                            setShowChartDialog(false);
+                            setLocation("/charts");
+                          },
+                          variant: "outline",
+                        }}
+                        className="p-5"
+                      />
                     ) : (
                       chartList.map(chart => (
                         <Card key={chart.id}>

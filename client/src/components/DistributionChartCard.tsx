@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/fluent/card";
-import { Button } from "@/components/fluent/button";
+import FluentEmptyState, { createEmptyStateCopy } from "@/components/FluentEmptyState";
 import { motion } from "framer-motion";
 import { BarChart3, Sparkles } from "lucide-react";
 
@@ -85,19 +85,22 @@ export function DistributionChartCard({
             })}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed p-6 text-center bg-gradient-to-br from-muted/30 to-background">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <p className="font-medium">{emptyTitle}</p>
-            <p className="text-sm text-muted-foreground mt-1">{emptyDescription}</p>
-            {onEmptyAction ? (
-              <Button className="mt-4" variant="outline" onClick={onEmptyAction}>
-                <BarChart3 className="h-4 w-4 mr-2" />
-                {emptyActionLabel}
-              </Button>
-            ) : null}
-          </div>
+          <FluentEmptyState
+            icon={Sparkles}
+            title={emptyTitle}
+            copy={createEmptyStateCopy({
+              reason: emptyDescription,
+              nextStep: "先完成一次内容创作或数据录入，再返回查看分布变化。",
+              actionLabel: emptyActionLabel,
+            })}
+            primaryAction={{
+              label: emptyActionLabel,
+              onClick: onEmptyAction || (() => undefined),
+              icon: <BarChart3 className="mr-2 h-4 w-4" />,
+              variant: "outline",
+            }}
+            className="p-6"
+          />
         )}
       </CardContent>
     </Card>

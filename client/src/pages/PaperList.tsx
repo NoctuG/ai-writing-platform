@@ -43,6 +43,7 @@ import {
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import FluentEmptyState, { createEmptyStateCopy } from "@/components/FluentEmptyState";
 
 const paperTypeNames = {
   graduation: "毕业论文",
@@ -266,34 +267,44 @@ export default function PaperList() {
 
           {!papers || papers.length === 0 ? (
             <Card className="border-2 border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <FileText className="mb-4 h-16 w-16 text-muted-foreground" />
-                <h3 className="mb-2 text-xl font-semibold">还没有论文</h3>
-                <p className="mb-6 text-muted-foreground">
-                  创建您的第一篇AI论文，开始高效写作
-                </p>
-                <Button onClick={() => setLocation("/")}>开始创作</Button>
+              <CardContent className="py-10">
+                <FluentEmptyState
+                  icon={FileText}
+                  title="还没有论文"
+                  copy={createEmptyStateCopy({
+                    reason: "当前账号下尚未生成论文，因此列表为空。",
+                    nextStep: "从首页发起一次论文生成，完成后会自动出现在这里。",
+                    actionLabel: "开始创作",
+                  })}
+                  primaryAction={{
+                    label: "开始创作",
+                    onClick: () => setLocation("/"),
+                  }}
+                />
               </CardContent>
             </Card>
           ) : filteredPapers.length === 0 ? (
             <Card className="border-2 border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <FolderOpen className="mb-4 h-16 w-16 text-muted-foreground" />
-                <h3 className="mb-2 text-xl font-semibold">没有匹配的论文</h3>
-                <p className="mb-6 text-muted-foreground">
-                  请调整搜索关键词或筛选条件
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setStatusFilter("all");
-                    setTypeFilter("all");
-                    setSortBy("createdAt");
+              <CardContent className="py-10">
+                <FluentEmptyState
+                  icon={FolderOpen}
+                  title="没有匹配的论文"
+                  copy={createEmptyStateCopy({
+                    reason: "现有筛选条件与关键词未命中任何论文。",
+                    nextStep: "清空筛选后重新浏览，或换一个关键词继续搜索。",
+                    actionLabel: "重置筛选",
+                  })}
+                  primaryAction={{
+                    label: "重置筛选",
+                    onClick: () => {
+                      setSearchTerm("");
+                      setStatusFilter("all");
+                      setTypeFilter("all");
+                      setSortBy("createdAt");
+                    },
+                    variant: "outline",
                   }}
-                >
-                  重置筛选
-                </Button>
+                />
               </CardContent>
             </Card>
           ) : viewMode === "card" ? (
