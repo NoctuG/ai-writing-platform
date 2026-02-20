@@ -1,10 +1,13 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/fluent/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/fluent/card";
-import { Loader2, FileText, TrendingUp, BookOpen, BarChart3 } from "lucide-react";
+import { Skeleton } from "@/components/fluent/skeleton";
+import { FileText, TrendingUp, BookOpen, BarChart3 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { getLoginUrl } from "@/const";
+import { motion } from "framer-motion";
+import { DistributionChartCard } from "@/components/DistributionChartCard";
 
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -16,8 +19,46 @@ export default function Dashboard() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-secondary/5">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/5">
+        <main className="container py-8 space-y-8">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-48 rounded bg-muted animate-pulse" />
+            <Skeleton className="h-4 w-72 rounded bg-muted animate-pulse" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index}>
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-4 w-20 rounded bg-muted animate-pulse" />
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Skeleton className="h-8 w-16 rounded bg-muted animate-pulse" />
+                  <Skeleton className="h-3 w-24 rounded bg-muted animate-pulse" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <Card key={index}>
+                <CardHeader>
+                  <Skeleton className="h-5 w-40 rounded bg-muted animate-pulse" />
+                  <Skeleton className="h-4 w-52 rounded bg-muted animate-pulse" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {Array.from({ length: 4 }).map((__, itemIndex) => (
+                    <div key={itemIndex} className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-20 rounded bg-muted animate-pulse" />
+                      <Skeleton className="h-2 w-40 rounded bg-muted animate-pulse" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -53,6 +94,20 @@ export default function Dashboard() {
     mla: "MLA",
     chicago: "Chicago",
   };
+
+  const paperTypeItems = (stats?.paperTypeDistribution || []).map((item) => ({
+    id: item.type,
+    label: paperTypeLabels[item.type] || item.type,
+    count: item.count,
+  }));
+
+  const citationFormatItems = (stats?.citationFormatDistribution || []).map((item) => ({
+    id: item.format,
+    label: citationFormatLabels[item.format] || item.format,
+    count: item.count,
+  }));
+
+  const citationTotal = citationFormatItems.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/5">
@@ -93,7 +148,14 @@ export default function Dashboard() {
               <FileText className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats?.totalPapers || 0}</div>
+              <motion.div
+                className="text-3xl font-bold"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.05 }}
+              >
+                {stats?.totalPapers || 0}
+              </motion.div>
               <p className="text-xs text-muted-foreground mt-1">
                 已完成 {stats?.completedPapers || 0} 篇
               </p>
@@ -108,7 +170,14 @@ export default function Dashboard() {
               <TrendingUp className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats?.averageQualityScore || 0}</div>
+              <motion.div
+                className="text-3xl font-bold"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.1 }}
+              >
+                {stats?.averageQualityScore || 0}
+              </motion.div>
               <p className="text-xs text-muted-foreground mt-1">满分 100 分</p>
             </CardContent>
           </Card>
@@ -121,9 +190,14 @@ export default function Dashboard() {
               <BookOpen className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">
+              <motion.div
+                className="text-3xl font-bold"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.15 }}
+              >
                 {stats?.citationFormatDistribution?.reduce((sum, item) => sum + item.count, 0) || 0}
-              </div>
+              </motion.div>
               <p className="text-xs text-muted-foreground mt-1">已添加的文献</p>
             </CardContent>
           </Card>
@@ -136,7 +210,14 @@ export default function Dashboard() {
               <BarChart3 className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats?.qualityTrend?.length || 0}</div>
+              <motion.div
+                className="text-3xl font-bold"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.2 }}
+              >
+                {stats?.qualityTrend?.length || 0}
+              </motion.div>
               <p className="text-xs text-muted-foreground mt-1">最近30天</p>
             </CardContent>
           </Card>
@@ -145,83 +226,32 @@ export default function Dashboard() {
         {/* Charts and Distributions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Paper Type Distribution */}
-          <Card>
-            <CardHeader>
-              <CardTitle>论文类型分布</CardTitle>
-              <CardDescription>您创建的不同类型论文数量</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {stats?.paperTypeDistribution && stats.paperTypeDistribution.length > 0 ? (
-                <div className="space-y-4">
-                  {stats.paperTypeDistribution.map((item) => (
-                    <div key={item.type} className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {paperTypeLabels[item.type] || item.type}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-32 h-2 bg-secondary rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary rounded-full"
-                            style={{
-                              width: `${(item.count / (stats?.totalPapers || 1)) * 100}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="text-sm text-muted-foreground w-8 text-right">
-                          {item.count}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">暂无数据</p>
-              )}
-            </CardContent>
-          </Card>
+          <DistributionChartCard
+            title="论文类型分布"
+            description="您创建的不同类型论文数量"
+            items={paperTypeItems}
+            total={stats?.totalPapers || 0}
+            tone="primary"
+            enableAnimation
+            emptyTitle="还没有论文类型数据"
+            emptyDescription="先创建第一篇论文，系统会自动生成类型分布图。"
+            emptyActionLabel="去创建论文"
+            onEmptyAction={() => setLocation("/")}
+          />
 
           {/* Citation Format Distribution */}
-          <Card>
-            <CardHeader>
-              <CardTitle>引用格式分布</CardTitle>
-              <CardDescription>您使用的不同引用格式统计</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {stats?.citationFormatDistribution && stats.citationFormatDistribution.length > 0 ? (
-                <div className="space-y-4">
-                  {stats.citationFormatDistribution.map((item) => (
-                    <div key={item.format} className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {citationFormatLabels[item.format] || item.format}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-32 h-2 bg-secondary rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-secondary/50 rounded-full"
-                            style={{
-                              width: `${
-                                (item.count /
-                                  (stats.citationFormatDistribution?.reduce(
-                                    (sum, i) => sum + i.count,
-                                    0
-                                  ) || 1)) *
-                                100
-                              }%`,
-                            }}
-                          />
-                        </div>
-                        <span className="text-sm text-muted-foreground w-8 text-right">
-                          {item.count}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">暂无数据</p>
-              )}
-            </CardContent>
-          </Card>
+          <DistributionChartCard
+            title="引用格式分布"
+            description="您使用的不同引用格式统计"
+            items={citationFormatItems}
+            total={citationTotal}
+            tone="secondary"
+            enableAnimation
+            emptyTitle="还没有引用格式数据"
+            emptyDescription="添加文献后，这里会展示引用格式偏好与占比。"
+            emptyActionLabel="去管理文献"
+            onEmptyAction={() => setLocation("/papers")}
+          />
         </div>
 
         {/* Recent Papers */}
