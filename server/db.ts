@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertPaper, InsertPaperVersion, InsertUser, paperVersions, papers, users, references, InsertReference, qualityChecks, InsertQualityCheck } from "../drizzle/schema";
+import { InsertPaper, InsertPaperVersion, InsertUser, paperVersions, papers, users, references, InsertReference, qualityChecks, InsertQualityCheck, knowledgeDocuments, InsertKnowledgeDocument, charts, InsertChart, folders, InsertFolder, paperTags, InsertPaperTag, paperTagAssociations, InsertPaperTagAssociation, translations, InsertTranslation } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -108,12 +108,15 @@ export async function getPaperById(id: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function getPapersByUserId(userId: number) {
+export async function getPapersByUserId(userId: number, includeDeleted = false) {
   const db = await getDb();
   if (!db) {
     throw new Error("Database not available");
   }
-  return db.select().from(papers).where(eq(papers.userId, userId)).orderBy(desc(papers.createdAt));
+  if (includeDeleted) {
+    return db.select().from(papers).where(eq(papers.userId, userId)).orderBy(desc(papers.createdAt));
+  }
+  return db.select().from(papers).where(and(eq(papers.userId, userId), eq(papers.isDeleted, 0))).orderBy(desc(papers.createdAt));
 }
 
 export async function updatePaper(id: number, updates: Partial<InsertPaper>) {
@@ -220,4 +223,190 @@ export async function getLatestQualityCheck(paperId: number) {
 
   const result = await db.select().from(qualityChecks).where(eq(qualityChecks.paperId, paperId)).orderBy(desc(qualityChecks.createdAt)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+// Knowledge document functions
+export async function createKnowledgeDocument(doc: InsertKnowledgeDocument) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(knowledgeDocuments).values(doc);
+  return result[0].insertId;
+}
+
+export async function getKnowledgeDocumentById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getKnowledgeDocumentsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.userId, userId)).orderBy(desc(knowledgeDocuments.createdAt));
+}
+
+export async function getKnowledgeDocumentsByPaperId(paperId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.paperId, paperId)).orderBy(desc(knowledgeDocuments.createdAt));
+}
+
+export async function updateKnowledgeDocument(id: number, updates: Partial<InsertKnowledgeDocument>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(knowledgeDocuments).set(updates).where(eq(knowledgeDocuments.id, id));
+}
+
+export async function deleteKnowledgeDocument(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(knowledgeDocuments).where(eq(knowledgeDocuments.id, id));
+}
+
+// Chart functions
+export async function createChart(chart: InsertChart) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(charts).values(chart);
+  return result[0].insertId;
+}
+
+export async function getChartsByPaperId(paperId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(charts).where(eq(charts.paperId, paperId)).orderBy(desc(charts.createdAt));
+}
+
+export async function getChartById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(charts).where(eq(charts.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateChart(id: number, updates: Partial<InsertChart>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(charts).set(updates).where(eq(charts.id, id));
+}
+
+export async function deleteChart(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(charts).where(eq(charts.id, id));
+}
+
+// Folder functions
+export async function createFolder(folder: InsertFolder) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(folders).values(folder);
+  return result[0].insertId;
+}
+
+export async function getFoldersByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(folders).where(eq(folders.userId, userId)).orderBy(desc(folders.createdAt));
+}
+
+export async function updateFolder(id: number, updates: Partial<InsertFolder>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(folders).set(updates).where(eq(folders.id, id));
+}
+
+export async function deleteFolder(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(folders).where(eq(folders.id, id));
+}
+
+// Tag functions
+export async function createTag(tag: InsertPaperTag) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(paperTags).values(tag);
+  return result[0].insertId;
+}
+
+export async function getTagsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(paperTags).where(eq(paperTags.userId, userId));
+}
+
+export async function deleteTag(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(paperTags).where(eq(paperTags.id, id));
+}
+
+export async function addTagToPaper(paperId: number, tagId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(paperTagAssociations).values({ paperId, tagId });
+}
+
+export async function removeTagFromPaper(paperId: number, tagId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(paperTagAssociations).where(and(eq(paperTagAssociations.paperId, paperId), eq(paperTagAssociations.tagId, tagId)));
+}
+
+export async function getTagsForPaper(paperId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const assocs = await db.select().from(paperTagAssociations).where(eq(paperTagAssociations.paperId, paperId));
+  if (assocs.length === 0) return [];
+  const tagIds = assocs.map(a => a.tagId);
+  const allTags = [];
+  for (const tagId of tagIds) {
+    const result = await db.select().from(paperTags).where(eq(paperTags.id, tagId)).limit(1);
+    if (result.length > 0) allTags.push(result[0]);
+  }
+  return allTags;
+}
+
+// Soft delete / recycle bin functions
+export async function softDeletePaper(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(papers).set({ isDeleted: 1, deletedAt: new Date() }).where(eq(papers.id, id));
+}
+
+export async function restoreDeletedPaper(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(papers).set({ isDeleted: 0, deletedAt: null }).where(eq(papers.id, id));
+}
+
+export async function getDeletedPapersByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(papers).where(and(eq(papers.userId, userId), eq(papers.isDeleted, 1))).orderBy(desc(papers.deletedAt));
+}
+
+export async function getPapersByFolderId(userId: number, folderId: number | null) {
+  const db = await getDb();
+  if (!db) return [];
+  if (folderId === null) {
+    return db.select().from(papers).where(and(eq(papers.userId, userId), eq(papers.isDeleted, 0), isNull(papers.folderId))).orderBy(desc(papers.createdAt));
+  }
+  return db.select().from(papers).where(and(eq(papers.userId, userId), eq(papers.isDeleted, 0), eq(papers.folderId, folderId))).orderBy(desc(papers.createdAt));
+}
+
+// Translation functions
+export async function createTranslation(translation: InsertTranslation) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(translations).values(translation);
+  return result[0].insertId;
+}
+
+export async function getTranslationsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(translations).where(eq(translations.userId, userId)).orderBy(desc(translations.createdAt));
 }

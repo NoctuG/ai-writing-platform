@@ -3,13 +3,18 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { createPaper, createPaperVersion, deletePaper, getLatestVersionNumber, getPaperById, getPapersByUserId, getPaperVersionById, getPaperVersionsByPaperId, updatePaper, createReference, getReferencesByPaperId, deleteReference, updateReference, createQualityCheck, getQualityChecksByPaperId, getLatestQualityCheck } from "./db";
+import { createPaper, createPaperVersion, deletePaper, getLatestVersionNumber, getPaperById, getPapersByUserId, getPaperVersionById, getPaperVersionsByPaperId, updatePaper, createReference, getReferencesByPaperId, deleteReference, updateReference, createQualityCheck, getQualityChecksByPaperId, getLatestQualityCheck, createKnowledgeDocument, getKnowledgeDocumentById, getKnowledgeDocumentsByUserId, getKnowledgeDocumentsByPaperId, updateKnowledgeDocument, deleteKnowledgeDocument, createChart, getChartsByPaperId, getChartById, updateChart, deleteChart, createFolder, getFoldersByUserId, updateFolder, deleteFolder, createTag, getTagsByUserId, deleteTag, addTagToPaper, removeTagFromPaper, getTagsForPaper, softDeletePaper, restoreDeletedPaper, getDeletedPapersByUserId, getPapersByFolderId, createTranslation, getTranslationsByUserId } from "./db";
 import { checkPaperQuality, checkGrammar } from "./qualityChecker";
 import { formatReference, type ReferenceData } from "./referenceFormatter";
 import { invokeLLM } from "./_core/llm";
 import { TRPCError } from "@trpc/server";
 import { generateWordDocument, generatePdfDocument } from "./documentExport";
 import { polishText, polishParagraphs, type PolishType } from "./textPolisher";
+import { analyzeDocument, chatWithDocument, generateWithRAG } from "./knowledgeBase";
+import { parseCSV, generateChartConfig, generateChartFromDescription } from "./chartGenerator";
+import { generateLatexDocument, getTemplateDescriptions, type JournalTemplate } from "./latexExporter";
+import { translateText, polishTranslation, type TranslationDomain } from "./translator";
+import { storagePut } from "./storage";
 
 
 export const appRouter = router({
@@ -31,6 +36,7 @@ export const appRouter = router({
       .input(z.object({
         title: z.string().min(1),
         type: z.enum(["graduation", "journal", "proposal", "professional"]),
+        folderId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const paperId = await createPaper({
@@ -38,6 +44,7 @@ export const appRouter = router({
           title: input.title,
           type: input.type,
           status: "generating",
+          folderId: input.folderId || null,
         });
         return { id: paperId };
       }),
@@ -45,6 +52,7 @@ export const appRouter = router({
     generateOutline: protectedProcedure
       .input(z.object({
         id: z.number(),
+        documentIds: z.array(z.number()).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const paper = await getPaperById(input.id);
@@ -63,6 +71,21 @@ export const appRouter = router({
             professional: "职称论文",
           };
 
+          // Build RAG context from uploaded documents
+          let ragContext = "";
+          if (input.documentIds && input.documentIds.length > 0) {
+            const docs = [];
+            for (const docId of input.documentIds) {
+              const doc = await getKnowledgeDocumentById(docId);
+              if (doc && doc.extractedText) {
+                docs.push(doc);
+              }
+            }
+            if (docs.length > 0) {
+              ragContext = `\n\n用户已上传以下参考文献，请基于这些文献内容生成大纲：\n${docs.map((d, i) => `[文献${i + 1}] ${d.fileName}:\n${d.extractedText?.substring(0, 5000)}`).join("\n\n")}`;
+            }
+          }
+
           const response = await invokeLLM({
             messages: [
               {
@@ -74,13 +97,13 @@ export const appRouter = router({
 2. 每个章节应有清晰的小节划分
 3. 使用学术化的语言
 4. 符合${typeNames[paper.type as keyof typeof typeNames]}的规范和要求
-5. 大纲应该详细且具有逻辑性
+5. 大纲应该详细且具有逻辑性${ragContext ? "\n6. 充分参考用户上传的文献内容" : ""}
 
 请以Markdown格式输出大纲，使用标题层级（#, ##, ###）来表示章节结构。`,
               },
               {
                 role: "user",
-                content: `论文类型：${typeNames[paper.type as keyof typeof typeNames]}\n论文标题：${paper.title}\n\n请生成详细的论文大纲。`,
+                content: `论文类型：${typeNames[paper.type as keyof typeof typeNames]}\n论文标题：${paper.title}\n\n请生成详细的论文大纲。${ragContext}`,
               },
             ],
           });
@@ -102,6 +125,7 @@ export const appRouter = router({
     generateContent: protectedProcedure
       .input(z.object({
         id: z.number(),
+        documentIds: z.array(z.number()).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         console.log('[generateContent] Starting for paperId:', input.id);
@@ -128,6 +152,21 @@ export const appRouter = router({
             professional: "职称论文",
           };
 
+          // Build RAG context
+          let ragContext = "";
+          if (input.documentIds && input.documentIds.length > 0) {
+            const docs = [];
+            for (const docId of input.documentIds) {
+              const doc = await getKnowledgeDocumentById(docId);
+              if (doc && doc.extractedText) {
+                docs.push(doc);
+              }
+            }
+            if (docs.length > 0) {
+              ragContext = `\n\n参考文献内容（请基于以下文献生成更准确的论文内容）：\n${docs.map((d, i) => `[文献${i + 1}] ${d.fileName}:\n${d.extractedText?.substring(0, 8000)}`).join("\n\n")}`;
+            }
+          }
+
           const response = await invokeLLM({
             messages: [
               {
@@ -141,13 +180,13 @@ export const appRouter = router({
 4. 可以在段落间插入表格进行阐述
 5. 符合${typeNames[paper.type as keyof typeof typeNames]}的规范和要求
 6. 内容应具有学术深度和专业性
-7. 适当引用相关研究（可以使用占位符如[1][2]表示引用）
+7. 适当引用相关研究（可以使用占位符如[1][2]表示引用）${ragContext ? "\n8. 优先参考用户上传的文献内容，减少AI幻觉" : ""}
 
 请以Markdown格式输出论文全文。`,
               },
               {
                 role: "user",
-                content: `论文标题：${paper.title}\n\n论文大纲：\n${paper.outline}\n\n请根据以上大纲撰写完整的论文内容。`,
+                content: `论文标题：${paper.title}\n\n论文大纲：\n${paper.outline}\n\n请根据以上大纲撰写完整的论文内容。${ragContext}`,
               },
             ],
           });
@@ -177,6 +216,12 @@ export const appRouter = router({
       return getPapersByUserId(ctx.user.id);
     }),
 
+    listByFolder: protectedProcedure
+      .input(z.object({ folderId: z.number().nullable() }))
+      .query(async ({ ctx, input }) => {
+        return getPapersByFolderId(ctx.user.id, input.folderId);
+      }),
+
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
@@ -200,7 +245,57 @@ export const appRouter = router({
         if (paper.userId !== ctx.user.id) {
           throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
         }
+        // Soft delete instead of hard delete
+        await softDeletePaper(input.id);
+        return { success: true };
+      }),
+
+    permanentDelete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const paper = await getPaperById(input.id);
+        if (!paper) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
+        }
+        if (paper.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
+        }
         await deletePaper(input.id);
+        return { success: true };
+      }),
+
+    restore: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const paper = await getPaperById(input.id);
+        if (!paper) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
+        }
+        if (paper.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
+        }
+        await restoreDeletedPaper(input.id);
+        return { success: true };
+      }),
+
+    getDeleted: protectedProcedure.query(async ({ ctx }) => {
+      return getDeletedPapersByUserId(ctx.user.id);
+    }),
+
+    moveToFolder: protectedProcedure
+      .input(z.object({
+        paperId: z.number(),
+        folderId: z.number().nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const paper = await getPaperById(input.paperId);
+        if (!paper) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
+        }
+        if (paper.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
+        }
+        await updatePaper(input.paperId, { folderId: input.folderId });
         return { success: true };
       }),
 
@@ -269,6 +364,51 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "导出PDF失败" });
         }
       }),
+
+    exportLatex: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        template: z.enum(["generic", "ieee", "nature", "elsevier", "springer"]).default("generic"),
+        authors: z.array(z.string()).optional(),
+        abstract: z.string().optional(),
+        keywords: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const paper = await getPaperById(input.id);
+        if (!paper) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
+        }
+        if (paper.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
+        }
+        if (!paper.content) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "论文内容为空" });
+        }
+
+        try {
+          const latexContent = generateLatexDocument({
+            title: paper.title,
+            type: paper.type,
+            content: paper.content,
+            outline: paper.outline || undefined,
+            template: input.template as JournalTemplate,
+            authors: input.authors,
+            abstract: input.abstract,
+            keywords: input.keywords,
+          });
+
+          const fileKey = `papers/${paper.id}/export_${Date.now()}.tex`;
+          const { url: fileUrl } = await storagePut(fileKey, latexContent, "application/x-tex");
+
+          return { fileUrl, latexContent };
+        } catch (error) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "导出LaTeX失败" });
+        }
+      }),
+
+    getLatexTemplates: protectedProcedure.query(() => {
+      return getTemplateDescriptions();
+    }),
 
     saveEdit: protectedProcedure
       .input(z.object({
@@ -367,7 +507,6 @@ export const appRouter = router({
         query: z.string().min(1),
       }))
       .mutation(async ({ input }) => {
-        // 模拟学术数据库搜索（使用LLM生成真实的参考文献）
         try {
           const response = await invokeLLM({
             messages: [
@@ -498,7 +637,7 @@ export const appRouter = router({
         citationFormat: z.enum(["gbt7714", "apa", "mla", "chicago"]),
       }))
       .mutation(async ({ input }) => {
-        const refs = await getReferencesByPaperId(0); // 需要先获取引用
+        const refs = await getReferencesByPaperId(0);
         const ref = refs.find((r) => r.id === input.id);
         if (!ref) {
           throw new TRPCError({ code: "NOT_FOUND", message: "文献不存在" });
@@ -543,7 +682,6 @@ export const appRouter = router({
         try {
           const result = await checkPaperQuality(paper.content, paper.outline);
 
-          // 保存检测结果
           await createQualityCheck({
             paperId: input.paperId,
             overallScore: result.overallScore,
@@ -629,6 +767,424 @@ export const appRouter = router({
       }),
   }),
 
+  // Knowledge Base / RAG
+  knowledge: router({
+    upload: protectedProcedure
+      .input(z.object({
+        fileName: z.string(),
+        fileContent: z.string(), // base64 encoded
+        mimeType: z.string(),
+        paperId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const buffer = Buffer.from(input.fileContent, "base64");
+          const fileKey = `knowledge/${ctx.user.id}/${Date.now()}_${input.fileName}`;
+          const { url: fileUrl } = await storagePut(fileKey, buffer, input.mimeType);
+
+          const docId = await createKnowledgeDocument({
+            userId: ctx.user.id,
+            paperId: input.paperId || null,
+            fileName: input.fileName,
+            fileKey,
+            fileUrl,
+            fileSize: buffer.length,
+            mimeType: input.mimeType,
+            status: "processing",
+          });
+
+          return { id: docId, fileUrl };
+        } catch (error: any) {
+          console.error("[Knowledge Upload] Error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "文件上传失败" });
+        }
+      }),
+
+    analyze: protectedProcedure
+      .input(z.object({
+        documentId: z.number(),
+        extractedText: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const doc = await getKnowledgeDocumentById(input.documentId);
+        if (!doc) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "文档不存在" });
+        }
+        if (doc.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此文档" });
+        }
+
+        try {
+          const analysis = await analyzeDocument(input.extractedText);
+
+          await updateKnowledgeDocument(input.documentId, {
+            extractedText: input.extractedText,
+            summary: analysis.summary,
+            metadata: JSON.stringify(analysis.metadata),
+            status: "ready",
+          });
+
+          return { summary: analysis.summary, metadata: analysis.metadata };
+        } catch (error: any) {
+          await updateKnowledgeDocument(input.documentId, { status: "failed" });
+          console.error("[Knowledge Analyze] Error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "文档分析失败" });
+        }
+      }),
+
+    chat: protectedProcedure
+      .input(z.object({
+        documentId: z.number(),
+        question: z.string(),
+        chatHistory: z.array(z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string(),
+        })).default([]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const doc = await getKnowledgeDocumentById(input.documentId);
+        if (!doc) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "文档不存在" });
+        }
+        if (doc.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此文档" });
+        }
+        if (!doc.extractedText) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "文档内容未提取" });
+        }
+
+        try {
+          const answer = await chatWithDocument(doc.extractedText, input.question, input.chatHistory);
+          return { answer };
+        } catch (error: any) {
+          console.error("[Knowledge Chat] Error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "对话失败" });
+        }
+      }),
+
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const docs = await getKnowledgeDocumentsByUserId(ctx.user.id);
+      return docs.map(doc => ({
+        ...doc,
+        metadata: doc.metadata ? JSON.parse(doc.metadata) : null,
+      }));
+    }),
+
+    listByPaper: protectedProcedure
+      .input(z.object({ paperId: z.number() }))
+      .query(async ({ input }) => {
+        const docs = await getKnowledgeDocumentsByPaperId(input.paperId);
+        return docs.map(doc => ({
+          ...doc,
+          metadata: doc.metadata ? JSON.parse(doc.metadata) : null,
+        }));
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const doc = await getKnowledgeDocumentById(input.id);
+        if (!doc) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "文档不存在" });
+        }
+        if (doc.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此文档" });
+        }
+        return {
+          ...doc,
+          metadata: doc.metadata ? JSON.parse(doc.metadata) : null,
+        };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const doc = await getKnowledgeDocumentById(input.id);
+        if (!doc) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "文档不存在" });
+        }
+        if (doc.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此文档" });
+        }
+        await deleteKnowledgeDocument(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // Chart Generation
+  chart: router({
+    generateFromCSV: protectedProcedure
+      .input(z.object({
+        paperId: z.number(),
+        csvData: z.string(),
+        description: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const { headers, rows } = parseCSV(input.csvData);
+          const config = await generateChartConfig(rows, headers, input.description);
+
+          const chartId = await createChart({
+            paperId: input.paperId,
+            userId: ctx.user.id,
+            title: config.title,
+            chartType: config.chartType,
+            dataSource: JSON.stringify(config.data),
+            chartConfig: JSON.stringify({
+              xAxisKey: config.xAxisKey,
+              dataKeys: config.dataKeys,
+              xAxisLabel: config.xAxisLabel,
+              yAxisLabel: config.yAxisLabel,
+            }),
+            description: config.description,
+          });
+
+          return { id: chartId, config };
+        } catch (error: any) {
+          console.error("[Chart Generate] Error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message || "图表生成失败" });
+        }
+      }),
+
+    generateFromDescription: protectedProcedure
+      .input(z.object({
+        paperId: z.number(),
+        description: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const config = await generateChartFromDescription(input.description);
+
+          const chartId = await createChart({
+            paperId: input.paperId,
+            userId: ctx.user.id,
+            title: config.title,
+            chartType: config.chartType,
+            dataSource: JSON.stringify(config.data),
+            chartConfig: JSON.stringify({
+              xAxisKey: config.xAxisKey,
+              dataKeys: config.dataKeys,
+              xAxisLabel: config.xAxisLabel,
+              yAxisLabel: config.yAxisLabel,
+            }),
+            description: config.description,
+          });
+
+          return { id: chartId, config };
+        } catch (error: any) {
+          console.error("[Chart Generate From Description] Error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "图表生成失败" });
+        }
+      }),
+
+    list: protectedProcedure
+      .input(z.object({ paperId: z.number() }))
+      .query(async ({ input }) => {
+        const chartList = await getChartsByPaperId(input.paperId);
+        return chartList.map(chart => ({
+          ...chart,
+          dataSource: JSON.parse(chart.dataSource),
+          chartConfig: JSON.parse(chart.chartConfig),
+        }));
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const chart = await getChartById(input.id);
+        if (!chart) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "图表不存在" });
+        }
+        if (chart.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权删除此图表" });
+        }
+        await deleteChart(input.id);
+        return { success: true };
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        chartType: z.enum(["line", "bar", "scatter", "pie", "radar", "area"]).optional(),
+        figureNumber: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const chart = await getChartById(input.id);
+        if (!chart) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "图表不存在" });
+        }
+        if (chart.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权修改此图表" });
+        }
+        const updates: any = {};
+        if (input.title) updates.title = input.title;
+        if (input.chartType) updates.chartType = input.chartType;
+        if (input.figureNumber !== undefined) updates.figureNumber = input.figureNumber;
+        await updateChart(input.id, updates);
+        return { success: true };
+      }),
+  }),
+
+  // Folder management
+  folder: router({
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        parentId: z.number().optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await createFolder({
+          userId: ctx.user.id,
+          name: input.name,
+          parentId: input.parentId || null,
+          color: input.color || null,
+        });
+        return { id };
+      }),
+
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return getFoldersByUserId(ctx.user.id);
+    }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        color: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const updates: any = {};
+        if (input.name) updates.name = input.name;
+        if (input.color) updates.color = input.color;
+        await updateFolder(input.id, updates);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteFolder(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // Tag management
+  tag: router({
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        color: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await createTag({
+          userId: ctx.user.id,
+          name: input.name,
+          color: input.color || null,
+        });
+        return { id };
+      }),
+
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return getTagsByUserId(ctx.user.id);
+    }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteTag(input.id);
+        return { success: true };
+      }),
+
+    addToPaper: protectedProcedure
+      .input(z.object({
+        paperId: z.number(),
+        tagId: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        await addTagToPaper(input.paperId, input.tagId);
+        return { success: true };
+      }),
+
+    removeFromPaper: protectedProcedure
+      .input(z.object({
+        paperId: z.number(),
+        tagId: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        await removeTagFromPaper(input.paperId, input.tagId);
+        return { success: true };
+      }),
+
+    getForPaper: protectedProcedure
+      .input(z.object({ paperId: z.number() }))
+      .query(async ({ input }) => {
+        return getTagsForPaper(input.paperId);
+      }),
+  }),
+
+  // Translation
+  translation: router({
+    translate: protectedProcedure
+      .input(z.object({
+        text: z.string().min(1),
+        sourceLang: z.string(),
+        targetLang: z.string(),
+        domain: z.enum(["general", "computer_science", "medicine", "law", "economics", "engineering", "natural_science", "social_science"]).default("general"),
+        paperId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const result = await translateText(
+            input.text,
+            input.sourceLang,
+            input.targetLang,
+            input.domain as TranslationDomain
+          );
+
+          await createTranslation({
+            userId: ctx.user.id,
+            paperId: input.paperId || null,
+            sourceText: input.text,
+            translatedText: result.translatedText,
+            sourceLang: input.sourceLang,
+            targetLang: input.targetLang,
+            domain: input.domain,
+          });
+
+          return result;
+        } catch (error: any) {
+          console.error("[Translation] Error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "翻译失败" });
+        }
+      }),
+
+    polish: protectedProcedure
+      .input(z.object({
+        text: z.string().min(1),
+        language: z.string(),
+        domain: z.enum(["general", "computer_science", "medicine", "law", "economics", "engineering", "natural_science", "social_science"]).default("general"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const polished = await polishTranslation(
+            input.text,
+            input.language,
+            input.domain as TranslationDomain
+          );
+          return { polishedText: polished };
+        } catch (error: any) {
+          console.error("[Translation Polish] Error:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "润色失败" });
+        }
+      }),
+
+    history: protectedProcedure.query(async ({ ctx }) => {
+      return getTranslationsByUserId(ctx.user.id);
+    }),
+  }),
+
   dashboard: router({
     getStatistics: protectedProcedure.query(async ({ ctx }) => {
       try {
@@ -644,7 +1200,6 @@ export const appRouter = router({
           references.push(...refs);
         }
 
-        // 计算统计数据
         const totalPapers = papers.length;
         const completedPapers = papers.filter((p) => p.status === "completed").length;
         const averageQualityScore =
@@ -652,7 +1207,6 @@ export const appRouter = router({
             ? qualityChecks.reduce((sum, c) => sum + c.overallScore, 0) / qualityChecks.length
             : 0;
 
-        // 质量评分趋势（最近30天）
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentChecks = qualityChecks
@@ -664,7 +1218,6 @@ export const appRouter = router({
           score: check.overallScore,
         }));
 
-        // 引用格式分布
         const formatCounts: Record<string, number> = {};
         references.forEach((ref) => {
           const format = ref.citationFormat || "gbt7714";
@@ -676,7 +1229,6 @@ export const appRouter = router({
           count,
         }));
 
-        // 论文类型分布
         const typeCounts: Record<string, number> = {};
         papers.forEach((paper) => {
           const type = paper.type || "unknown";
@@ -688,6 +1240,9 @@ export const appRouter = router({
           count,
         }));
 
+        // Knowledge base stats
+        const knowledgeDocs = await getKnowledgeDocumentsByUserId(ctx.user.id);
+
         return {
           totalPapers,
           completedPapers,
@@ -695,6 +1250,7 @@ export const appRouter = router({
           qualityTrend,
           citationFormatDistribution,
           paperTypeDistribution,
+          totalDocuments: knowledgeDocs.length,
           recentPapers: papers.slice(0, 5).map((p) => ({
             id: p.id,
             title: p.title,

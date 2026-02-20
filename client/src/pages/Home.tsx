@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { BookOpen, FileText, GraduationCap, Sparkles } from "lucide-react";
+import { BarChart3, BookOpen, FileText, FolderOpen, GraduationCap, Languages, Sparkles, Database, FileCode } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -17,6 +17,57 @@ const paperTypes = [
   { value: "proposal", label: "开题报告", icon: BookOpen, description: "研究课题开题报告" },
   { value: "professional", label: "职称论文", icon: Sparkles, description: "职称评审论文" },
 ] as const;
+
+const features = [
+  {
+    title: "RAG知识库",
+    description: "上传PDF文献，AI基于文献内容生成论文，减少幻觉，提高准确性",
+    icon: Database,
+    href: "/knowledge",
+    color: "text-blue-600",
+    bgColor: "bg-blue-100",
+  },
+  {
+    title: "数据可视化",
+    description: "输入CSV数据或文字描述，AI自动生成折线图、柱状图、散点图等学术图表",
+    icon: BarChart3,
+    href: "/charts",
+    color: "text-green-600",
+    bgColor: "bg-green-100",
+  },
+  {
+    title: "学术翻译",
+    description: "支持中英双语对照翻译，精准学术术语，母语级润色",
+    icon: Languages,
+    href: "/translation",
+    color: "text-purple-600",
+    bgColor: "bg-purple-100",
+  },
+  {
+    title: "LaTeX导出",
+    description: "支持IEEE、Nature、Elsevier等期刊模板，一键导出.tex源码",
+    icon: FileCode,
+    href: null,
+    color: "text-orange-600",
+    bgColor: "bg-orange-100",
+  },
+  {
+    title: "项目管理",
+    description: "文件夹分组、标签管理、回收站，系统化管理您的研究论文",
+    icon: FolderOpen,
+    href: "/papers",
+    color: "text-cyan-600",
+    bgColor: "bg-cyan-100",
+  },
+  {
+    title: "智能写作",
+    description: "AI大纲生成、全文撰写、质量检测、参考文献管理、文本润色",
+    icon: Sparkles,
+    href: null,
+    color: "text-pink-600",
+    bgColor: "bg-pink-100",
+  },
+];
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
@@ -60,33 +111,29 @@ export default function Home() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-accent/20 to-background p-4">
-        <div className="max-w-2xl w-full text-center space-y-8">
+        <div className="max-w-4xl w-full text-center space-y-8">
           <div className="space-y-4">
             <h1 className="text-5xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">
               AI学术论文写作平台
             </h1>
             <p className="text-xl text-muted-foreground">
-              通过先进的自然语言处理技术，快速撰写高质量学术论文
+              一站式专业学术科研工作站：RAG知识库、智能写作、数据可视化、学术翻译
             </p>
           </div>
 
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold">支持多种论文类型</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-12">
-            {paperTypes.map((type) => {
-              const Icon = type.icon;
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-12">
+            {features.map((feature) => {
+              const Icon = feature.icon;
               return (
-                <Card key={type.value} className="border-2 hover:border-primary/50 transition-colors">
+                <Card key={feature.title} className="border-2 hover:border-primary/50 transition-colors text-left">
                   <CardHeader>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <Icon className="h-6 w-6 text-primary" />
+                      <div className={`p-2 rounded-lg ${feature.bgColor}`}>
+                        <Icon className={`h-5 w-5 ${feature.color}`} />
                       </div>
-                      <CardTitle className="text-lg">{type.label}</CardTitle>
+                      <CardTitle className="text-base">{feature.title}</CardTitle>
                     </div>
-                    <CardDescription>{type.description}</CardDescription>
+                    <CardDescription className="text-sm">{feature.description}</CardDescription>
                   </CardHeader>
                 </Card>
               );
@@ -117,6 +164,15 @@ export default function Home() {
             <Button variant="ghost" onClick={() => setLocation("/papers")}>
               我的论文
             </Button>
+            <Button variant="ghost" onClick={() => setLocation("/knowledge")}>
+              知识库
+            </Button>
+            <Button variant="ghost" onClick={() => setLocation("/charts")}>
+              图表工具
+            </Button>
+            <Button variant="ghost" onClick={() => setLocation("/translation")}>
+              翻译
+            </Button>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">欢迎，{user?.name || user?.email}</span>
             </div>
@@ -125,11 +181,11 @@ export default function Home() {
       </header>
 
       <main className="container py-12">
-        <div className="max-w-3xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center space-y-4">
             <h1 className="text-4xl font-bold">开始创作您的学术论文</h1>
             <p className="text-lg text-muted-foreground">
-              选择论文类型，输入标题，AI将在1分钟内为您生成完整的论文大纲和内容
+              选择论文类型，输入标题，AI将为您生成完整的论文大纲和内容
             </p>
           </div>
 
@@ -195,39 +251,32 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <div className="space-y-6 pt-8">
-            <h2 className="text-2xl font-semibold text-center">平台核心功能</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">智能大纲生成</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    根据论文类型和标题，自动生成结构完整、逻辑清晰的论文大纲
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">快速内容生成</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    基于大纲在1分钟内生成8000字以上的学术论文全文内容
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">多格式导出</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    支持导出为Word和PDF格式，方便后续编辑和提交
-                  </p>
-                </CardContent>
-              </Card>
+          {/* Feature Cards - Quick Access */}
+          <div className="space-y-6 pt-4">
+            <h2 className="text-2xl font-semibold text-center">工具箱</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {features.filter(f => f.href).map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <Card
+                    key={feature.title}
+                    className="border-2 hover:border-primary/50 transition-colors cursor-pointer"
+                    onClick={() => feature.href && setLocation(feature.href)}
+                  >
+                    <CardHeader>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`p-2 rounded-lg ${feature.bgColor}`}>
+                          <Icon className={`h-5 w-5 ${feature.color}`} />
+                        </div>
+                        <CardTitle className="text-lg">{feature.title}</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">{feature.description}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         </div>
