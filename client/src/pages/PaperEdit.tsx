@@ -69,6 +69,19 @@ const paperTypeNames = {
 
 const FOCUS_MODE_STORAGE_KEY = "paper-edit-focus-mode";
 const FOCUS_SHORTCUT_HINT_KEY = "paper-edit-focus-shortcut-hint-shown";
+const latexTemplateIds = [
+  "generic",
+  "ieee",
+  "nature",
+  "elsevier",
+  "springer",
+  "cn_cjc",
+  "cn_jos",
+  "thesis_undergrad",
+  "thesis_master",
+  "thesis_phd",
+] as const;
+type LatexTemplateId = (typeof latexTemplateIds)[number];
 
 export default function PaperEdit() {
   const { id } = useParams<{ id: string }>();
@@ -85,9 +98,9 @@ export default function PaperEdit() {
   const [showLatexDialog, setShowLatexDialog] = useState(false);
   const [showChartDialog, setShowChartDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<"outline" | "content">("outline");
-  const [latexTemplate, setLatexTemplate] = useState<
-    "generic" | "ieee" | "nature" | "elsevier" | "springer"
-  >("generic");
+  const [latexTemplate, setLatexTemplate] = useState<LatexTemplateId>(
+    "generic"
+  );
   const utils = trpc.useUtils();
   const outlineEditorRef = React.useRef<MarkdownEditorHandle>(null);
   const contentEditorRef = React.useRef<MarkdownEditorHandle>(null);
@@ -540,21 +553,38 @@ export default function PaperEdit() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        {latexTemplates?.map(template => (
-                          <div
-                            key={template.id}
-                            className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                              latexTemplate === template.id
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-primary/50"
-                            }`}
-                            onClick={() => setLatexTemplate(template.id)}
-                          >
-                            <div className="font-semibold">{template.name}</div>
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {template.description}
+                      <div className="space-y-3">
+                        {latexTemplates?.map(group => (
+                          <div key={group.category} className="space-y-2">
+                            <div className="rounded-md bg-muted/40 p-3">
+                              <div className="font-semibold text-sm">
+                                {group.categoryName}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {group.description}
+                              </div>
                             </div>
+                            {group.templates.map(template => (
+                              <div
+                                key={template.id}
+                                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                                  latexTemplate === template.id
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border hover:border-primary/50"
+                                }`}
+                                onClick={() =>
+                                  setLatexTemplate(template.id as LatexTemplateId)
+                                }
+                              >
+                                <div className="font-semibold">{template.name}</div>
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  {template.description}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  适用场景：{template.useCase}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>

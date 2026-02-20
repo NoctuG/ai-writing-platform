@@ -65,9 +65,9 @@ import {
   generateChartFromDescription,
 } from "./chartGenerator";
 import {
+  LATEX_TEMPLATE_IDS,
   generateLatexDocument,
   getTemplateDescriptions,
-  type JournalTemplate,
 } from "./latexExporter";
 import {
   translateText,
@@ -497,9 +497,7 @@ export const appRouter = router({
       .input(
         z.object({
           id: z.number(),
-          template: z
-            .enum(["generic", "ieee", "nature", "elsevier", "springer"])
-            .default("generic"),
+          template: z.enum(LATEX_TEMPLATE_IDS).default("generic"),
           authors: z.array(z.string()).optional(),
           abstract: z.string().optional(),
           keywords: z.array(z.string()).optional(),
@@ -523,7 +521,7 @@ export const appRouter = router({
             type: paper.type,
             content: paper.content,
             outline: paper.outline || undefined,
-            template: input.template as JournalTemplate,
+            template: input.template,
             authors: input.authors,
             abstract: input.abstract,
             keywords: input.keywords,
@@ -1490,9 +1488,7 @@ export const appRouter = router({
       .input(
         z.object({
           paperId: z.number(),
-          template: z
-            .enum(["generic", "ieee", "nature", "elsevier", "springer"])
-            .default("generic"),
+          template: z.enum(LATEX_TEMPLATE_IDS).default("generic"),
           authors: z.array(z.string()).optional(),
           abstract: z.string().optional(),
           keywords: z.array(z.string()).optional(),
@@ -1520,7 +1516,7 @@ export const appRouter = router({
             type: paper.type,
             content,
             outline,
-            template: input.template as JournalTemplate,
+            template: input.template,
             authors: input.authors,
             abstract: input.abstract,
             keywords: input.keywords,
