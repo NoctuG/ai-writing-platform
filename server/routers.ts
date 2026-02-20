@@ -1,4 +1,10 @@
 import { COOKIE_NAME } from "@shared/const";
+import {
+  PAPER_STRUCTURE_MODULES,
+  defaultPaperStructureByType,
+  graduationStructureOrderText,
+  paperStructureModuleLabels,
+} from "@shared/types";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -76,6 +82,70 @@ import {
 } from "./translator";
 import { storagePut } from "./storage";
 import { searchPapers } from "./semanticScholar";
+
+const GRADUATION_STRUCTURE_ORDER = PAPER_STRUCTURE_MODULES.map(
+  module => paperStructureModuleLabels[module]
+);
+
+const extractChineseAbstractSection = (content: string): string => {
+  const headingRegex = /(?:^|\n)##\s*中文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
+  const match = content.match(headingRegex);
+  return match?.[1]?.trim() ?? "";
+};
+
+const upsertEnglishAbstractSection = (
+  content: string,
+  translatedText: string
+): string => {
+  const englishSection = `## 英文摘要与关键词\n${translatedText.trim()}\n`;
+  const sectionRegex = /(?:^|\n)##\s*英文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
+
+  if (sectionRegex.test(content)) {
+    return content.replace(sectionRegex, `\n${englishSection}`);
+  }
+
+  const anchorRegex = /(?:^|\n)##\s*中文摘要与关键词\s*\n([\s\S]*?)(?=\n##\s+|$)/;
+  const anchorMatch = content.match(anchorRegex);
+  if (!anchorMatch || anchorMatch.index === undefined) {
+    return `${content.trim()}\n\n${englishSection}`;
+  }
+
+  const anchorStart = anchorMatch.index;
+  const anchorBlock = anchorMatch[0];
+  const insertIndex = anchorStart + anchorBlock.length;
+  return `${content.slice(0, insertIndex)}\n${englishSection}${content.slice(insertIndex)}`;
+};
+
+const extractSectionBody = (content: string, heading: string): string => {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(
+    `(?:^|\\n)##\\s*${escaped}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|$)`
+  );
+  const match = content.match(pattern);
+  return match?.[1]?.trim() ?? "";
+};
+
+export const enforceGraduationModuleOrder = (
+  markdown: string,
+  mode: "outline" | "content"
+): string => {
+  const firstHeadingMatch = markdown.match(/^#\s+.*$/m);
+  const titleLine =
+    firstHeadingMatch?.[0] ??
+    (mode === "outline" ? "# 毕业论文大纲" : "# 毕业论文全文");
+
+  const sections = GRADUATION_STRUCTURE_ORDER.map(heading => {
+    const body = extractSectionBody(markdown, heading);
+    const fallback =
+      mode === "outline"
+        ? `- 待补充：${heading}模块`
+        : `（本节为${heading}，请根据论文主题补充完整内容）`;
+
+    return `## ${heading}\n${body || fallback}`;
+  });
+
+  return `${titleLine}\n\n${sections.join("\n\n")}`;
+};
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -179,19 +249,25 @@ export const appRouter = router({
 3. 使用学术化的语言
 4. 符合${typeNames[paper.type as keyof typeof typeNames]}的规范和要求
 5. 大纲应该详细且具有逻辑性${ragContext ? "\n6. 充分参考用户上传的文献内容" : ""}
+7. 对于毕业论文，必须严格按照固定模块输出且顺序不可变：${graduationStructureOrderText}
+8. 对于毕业论文，默认开启全部模块，不得遗漏任何模块
 
 请以Markdown格式输出大纲，使用标题层级（#, ##, ###）来表示章节结构。`,
               },
               {
                 role: "user",
-                content: `论文类型：${typeNames[paper.type as keyof typeof typeNames]}\n论文标题：${paper.title}\n\n请生成详细的论文大纲。${ragContext}`,
+                content: `论文类型：${typeNames[paper.type as keyof typeof typeNames]}\n论文标题：${paper.title}\n\n毕业论文结构配置（默认全开，顺序固定）：\n${defaultPaperStructureByType.graduation.map(item => `${item.order}. ${item.label}（${item.enabled ? "开启" : "关闭"}）`).join("\n")}\n\n请生成详细的论文大纲。${ragContext}`,
               },
             ],
           });
 
           const outlineContent = response.choices[0]?.message?.content;
-          const outline =
+          const outlineRaw =
             typeof outlineContent === "string" ? outlineContent : "";
+          const outline =
+            paper.type === "graduation"
+              ? enforceGraduationModuleOrder(outlineRaw, "outline")
+              : outlineRaw;
           await updatePaper(input.id, { outline });
 
           return { outline };
@@ -277,12 +353,14 @@ export const appRouter = router({
 5. 符合${typeNames[paper.type as keyof typeof typeNames]}的规范和要求
 6. 内容应具有学术深度和专业性
 7. 适当引用相关研究（可以使用占位符如[1][2]表示引用）${ragContext ? "\n8. 优先参考用户上传的文献内容，减少AI幻觉" : ""}
+9. 必须按模块逐段生成，不得跳段：封面、诚信声明、授权书、中文摘要与关键词、英文摘要与关键词、正文、参考文献、致谢
+10. 致谢必须位于参考文献之后，二者顺序不得颠倒
 
 请以Markdown格式输出论文全文。`,
               },
               {
                 role: "user",
-                content: `论文标题：${paper.title}\n\n论文大纲：\n${paper.outline}\n\n请根据以上大纲撰写完整的论文内容。${ragContext}`,
+                content: `论文标题：${paper.title}\n\n论文大纲：\n${paper.outline}\n\n若为毕业论文，请使用以下固定模块顺序逐段生成：${GRADUATION_STRUCTURE_ORDER.join(" -> ")}。\n特别注意：致谢必须位于参考文献之后。\n\n请根据以上大纲撰写完整的论文内容。${ragContext}`,
               },
             ],
           });
@@ -298,8 +376,35 @@ export const appRouter = router({
             content.length,
             "characters"
           );
+          let finalContent = content;
+          const chineseAbstract = extractChineseAbstractSection(content);
+          if (chineseAbstract) {
+            try {
+              const translation = await translateText(
+                chineseAbstract,
+                "zh",
+                "en",
+                "general"
+              );
+              finalContent = upsertEnglishAbstractSection(
+                content,
+                translation.translatedText
+              );
+            } catch (translationError) {
+              console.error(
+                "[generateContent] Failed to auto-generate English abstract:",
+                translationError
+              );
+            }
+          }
+
+          const normalizedContent =
+            paper.type === "graduation"
+              ? enforceGraduationModuleOrder(finalContent, "content")
+              : finalContent;
+
           await updatePaper(input.id, {
-            content,
+            content: normalizedContent,
             status: "completed",
           });
           console.log(
@@ -307,7 +412,7 @@ export const appRouter = router({
             input.id
           );
 
-          return { content };
+          return { content: normalizedContent };
         } catch (error) {
           console.error(
             "[generateContent] Error occurred for paperId:",
