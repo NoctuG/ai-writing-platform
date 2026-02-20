@@ -13,7 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, FileText, Loader2, Trash2 } from "lucide-react";
+import { CheckCircle2, FileText, Loader2, Trash2, FolderOpen } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -72,7 +72,12 @@ export default function PaperList() {
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             AI学术论文写作平台
           </h1>
-          <Button onClick={() => setLocation("/")}>创建新论文</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setLocation("/recycle-bin")}>
+              <Trash2 className="mr-2 h-4 w-4" />回收站
+            </Button>
+            <Button onClick={() => setLocation("/")}>创建新论文</Button>
+          </div>
         </div>
       </header>
 

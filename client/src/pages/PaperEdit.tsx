@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Clock, Download, History, Loader2, RotateCcw, Save, BookOpen, CheckCircle } from "lucide-react";
+import { ArrowLeft, Clock, Download, History, Loader2, RotateCcw, Save, BookOpen, CheckCircle, FileCode } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
@@ -112,6 +112,18 @@ export default function PaperEdit() {
     },
     onError: (error) => {
       toast.error(error.message || "导出PDF失败");
+    },
+  });
+
+  const exportLatexMutation = trpc.paper.exportLatex.useMutation({
+    onSuccess: (data) => {
+      toast.success("导出LaTeX成功！");
+      if (data.fileUrl) {
+        window.open(data.fileUrl, "_blank");
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || "导出LaTeX失败");
     },
   });
 
@@ -323,6 +335,23 @@ export default function PaperEdit() {
                   <>
                     <Download className="mr-2 h-4 w-4" />
                     导出Word
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => exportLatexMutation.mutate({ id: paperId, template: "generic" })}
+                disabled={exportLatexMutation.isPending}
+              >
+                {exportLatexMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    导出中...
+                  </>
+                ) : (
+                  <>
+                    <FileCode className="mr-2 h-4 w-4" />
+                    导出LaTeX
                   </>
                 )}
               </Button>

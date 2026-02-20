@@ -45,6 +45,9 @@ export const papers = mysqlTable("papers", {
   pdfFileKey: text("pdfFileKey"),
   pdfFileUrl: text("pdfFileUrl"),
   errorMessage: text("errorMessage"),
+  folderId: int("folderId"),
+  isDeleted: int("isDeleted").default(0).notNull(), // 0 = active, 1 = in recycle bin
+  deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -126,3 +129,106 @@ export const polishHistory = mysqlTable("polishHistory", {
 
 export type PolishHistory = typeof polishHistory.$inferSelect;
 export type InsertPolishHistory = typeof polishHistory.$inferInsert;
+
+/**
+ * Knowledge documents table for RAG support (uploaded PDFs/literature)
+ */
+export const knowledgeDocuments = mysqlTable("knowledgeDocuments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  paperId: int("paperId").references(() => papers.id, { onDelete: 'cascade' }),
+  fileName: text("fileName").notNull(),
+  fileKey: text("fileKey").notNull(),
+  fileUrl: text("fileUrl").notNull(),
+  fileSize: int("fileSize").notNull(),
+  mimeType: varchar("mimeType", { length: 100 }).notNull(),
+  extractedText: text("extractedText"),
+  summary: text("summary"),
+  metadata: text("metadata"), // JSON: { pageCount, authors, title, abstract, keywords }
+  status: mysqlEnum("status", ["uploading", "processing", "ready", "failed"]).default("uploading").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type KnowledgeDocument = typeof knowledgeDocuments.$inferSelect;
+export type InsertKnowledgeDocument = typeof knowledgeDocuments.$inferInsert;
+
+/**
+ * Charts table for storing generated chart configurations
+ */
+export const charts = mysqlTable("charts", {
+  id: int("id").autoincrement().primaryKey(),
+  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  chartType: mysqlEnum("chartType", ["line", "bar", "scatter", "pie", "radar", "area"]).notNull(),
+  dataSource: text("dataSource").notNull(), // JSON: raw data array
+  chartConfig: text("chartConfig").notNull(), // JSON: recharts config
+  description: text("description"),
+  figureNumber: int("figureNumber"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Chart = typeof charts.$inferSelect;
+export type InsertChart = typeof charts.$inferInsert;
+
+/**
+ * Folders table for project/file management
+ */
+export const folders = mysqlTable("folders", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  parentId: int("parentId"),
+  color: varchar("color", { length: 20 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Folder = typeof folders.$inferSelect;
+export type InsertFolder = typeof folders.$inferInsert;
+
+/**
+ * Paper tags table for tagging papers
+ */
+export const paperTags = mysqlTable("paperTags", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: varchar("name", { length: 100 }).notNull(),
+  color: varchar("color", { length: 20 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PaperTag = typeof paperTags.$inferSelect;
+export type InsertPaperTag = typeof paperTags.$inferInsert;
+
+/**
+ * Paper-tag associations
+ */
+export const paperTagAssociations = mysqlTable("paperTagAssociations", {
+  id: int("id").autoincrement().primaryKey(),
+  paperId: int("paperId").notNull().references(() => papers.id, { onDelete: 'cascade' }),
+  tagId: int("tagId").notNull().references(() => paperTags.id, { onDelete: 'cascade' }),
+});
+
+export type PaperTagAssociation = typeof paperTagAssociations.$inferSelect;
+export type InsertPaperTagAssociation = typeof paperTagAssociations.$inferInsert;
+
+/**
+ * Translation history table
+ */
+export const translations = mysqlTable("translations", {
+  id: int("id").autoincrement().primaryKey(),
+  paperId: int("paperId").references(() => papers.id, { onDelete: 'cascade' }),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sourceText: text("sourceText").notNull(),
+  translatedText: text("translatedText").notNull(),
+  sourceLang: varchar("sourceLang", { length: 10 }).notNull(),
+  targetLang: varchar("targetLang", { length: 10 }).notNull(),
+  domain: varchar("domain", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Translation = typeof translations.$inferSelect;
+export type InsertTranslation = typeof translations.$inferInsert;

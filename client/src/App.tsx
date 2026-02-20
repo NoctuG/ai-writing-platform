@@ -9,6 +9,10 @@ import PaperGenerate from "./pages/PaperGenerate";
 import PaperList from "./pages/PaperList";
 import PaperEdit from "./pages/PaperEdit";
 import Dashboard from "./pages/Dashboard";
+import KnowledgeBase from "./pages/KnowledgeBase";
+import ChartTools from "./pages/ChartTools";
+import TranslationTools from "./pages/TranslationTools";
+import RecycleBin from "./pages/RecycleBin";
 
 
 function Router() {
@@ -19,6 +23,10 @@ function Router() {
       <Route path="/paper/:id" component={PaperGenerate} />
       <Route path="/paper/:id/edit" component={PaperEdit} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/knowledge" component={KnowledgeBase} />
+      <Route path="/charts" component={ChartTools} />
+      <Route path="/translation" component={TranslationTools} />
+      <Route path="/recycle-bin" component={RecycleBin} />
 
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
