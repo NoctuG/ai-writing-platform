@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { generateLatexDocument, getTemplateDescriptions, type JournalTemplate } from './latexExporter';
+import {
+  LATEX_TEMPLATE_IDS,
+  generateLatexDocument,
+  getTemplateDescriptions,
+  type JournalTemplate,
+} from './latexExporter';
 
 describe('LaTeX Exporter', () => {
   describe('generateLatexDocument', () => {
@@ -152,32 +157,60 @@ describe('LaTeX Exporter', () => {
 
       expect(result).toContain('\\documentclass[smallextended]{svjour3}');
     });
+
+    it.each([
+      ['cn_cjc', '\\bibliographystyle{gbt7714-numerical}'],
+      ['cn_jos', '\\setstretch{1.3}'],
+      ['thesis_undergrad', '\\documentclass[UTF8,zihao=-4,oneside]{ctexrep}'],
+      ['thesis_master', '\\documentclass[UTF8,zihao=-4,oneside]{ctexbook}'],
+      ['thesis_phd', '\\geometry{a4paper,margin=2.8cm}'],
+    ] as const)('should generate LaTeX for new template %s', (template, expected) => {
+      const result = generateLatexDocument({
+        title: '模板测试',
+        type: 'graduation',
+        content: '# 正文',
+        template: template as JournalTemplate,
+      });
+
+      expect(result).toContain(expected);
+    });
   });
 
   describe('getTemplateDescriptions', () => {
-    it('should return all template descriptions', () => {
-      const templates = getTemplateDescriptions();
+    it('should return grouped template descriptions', () => {
+      const groups = getTemplateDescriptions();
 
-      expect(templates).toHaveLength(5);
-      expect(templates.map(t => t.id)).toEqual(['generic', 'ieee', 'nature', 'elsevier', 'springer']);
+      expect(groups).toHaveLength(3);
+      expect(groups.map(group => group.category)).toEqual([
+        'international_journal',
+        'domestic_journal',
+        'thesis',
+      ]);
     });
 
-    it('should include name and description for each template', () => {
-      const templates = getTemplateDescriptions();
+    it('should include all template ids exactly once', () => {
+      const groups = getTemplateDescriptions();
+      const ids = groups.flatMap(group => group.templates.map(template => template.id));
 
-      templates.forEach(template => {
-        expect(template.id).toBeTruthy();
-        expect(template.name).toBeTruthy();
-        expect(template.description).toBeTruthy();
+      expect(ids).toHaveLength(LATEX_TEMPLATE_IDS.length);
+      expect(ids).toEqual(LATEX_TEMPLATE_IDS);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('should include name, description and useCase for each template', () => {
+      const groups = getTemplateDescriptions();
+
+      groups.forEach(group => {
+        expect(group.categoryName).toBeTruthy();
+        expect(group.description).toBeTruthy();
+
+        group.templates.forEach(template => {
+          expect(template.id).toBeTruthy();
+          expect(template.name).toBeTruthy();
+          expect(template.description).toBeTruthy();
+          expect(template.useCase).toBeTruthy();
+        });
       });
-    });
-
-    it('should have Chinese descriptions', () => {
-      const templates = getTemplateDescriptions();
-      const genericTemplate = templates.find(t => t.id === 'generic');
-
-      expect(genericTemplate?.name).toBe('通用模板');
-      expect(genericTemplate?.description).toContain('学术论文');
     });
   });
 });
