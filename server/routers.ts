@@ -416,7 +416,28 @@ export const appRouter = router({
       }),
 
     exportWord: protectedProcedure
-      .input(z.object({ id: z.number() }))
+      .input(
+        z.object({
+          id: z.number(),
+          styleProfile: z
+            .object({
+              profileName: z.string().optional(),
+              chineseBodyFont: z.string().optional(),
+              chineseHeadingFont: z.string().optional(),
+              latinFont: z.string().optional(),
+              bodyFontSizePt: z.number().optional(),
+              paragraphBeforePt: z.number().optional(),
+              paragraphAfterPt: z.number().optional(),
+              lineSpacing: z
+                .object({
+                  mode: z.enum(["multiple", "exact"]),
+                  value: z.number(),
+                })
+                .optional(),
+            })
+            .optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const paper = await getPaperById(input.id);
         if (!paper) {
@@ -438,6 +459,7 @@ export const appRouter = router({
             type: paper.type,
             outline: paper.outline,
             content: paper.content,
+            styleProfile: input.styleProfile,
           });
 
           await updatePaper(input.id, {
