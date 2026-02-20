@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/fluent/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/fluent/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/components/fluent/alert-dialog";
 import { trpc } from "@/lib/trpc";
 import { CheckCircle2, FileText, Loader2, Trash2, FolderOpen } from "lucide-react";
 import { useLocation } from "wouter";

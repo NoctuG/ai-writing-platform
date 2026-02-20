@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/fluent/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/fluent/card";
 import { Loader2, FileText, TrendingUp, BookOpen, BarChart3 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";

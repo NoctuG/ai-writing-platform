@@ -1,14 +1,14 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/fluent/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/fluent/card";
+import { Input } from "@/components/fluent/input";
+import { Label } from "@/components/fluent/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/fluent/select";
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@/components/fluent/dialog";
+import { ScrollArea } from "@/components/fluent/scroll-area";
 import { trpc } from "@/lib/trpc";
 import { BookOpen, Plus, Search, Trash2, Copy, Loader2 } from "lucide-react";
 import { useState } from "react";
