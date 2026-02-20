@@ -3,22 +3,81 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { createPaper, createPaperVersion, deletePaper, getLatestVersionNumber, getPaperById, getPapersByUserId, getPaperVersionById, getPaperVersionsByPaperId, updatePaper, createReference, getReferencesByPaperId, deleteReference, updateReference, createQualityCheck, getQualityChecksByPaperId, getLatestQualityCheck, createKnowledgeDocument, getKnowledgeDocumentById, getKnowledgeDocumentsByUserId, getKnowledgeDocumentsByPaperId, updateKnowledgeDocument, deleteKnowledgeDocument, createChart, getChartsByPaperId, getChartById, updateChart, deleteChart, createFolder, getFoldersByUserId, updateFolder, deleteFolder, createTag, getTagsByUserId, deleteTag, addTagToPaper, removeTagFromPaper, getTagsForPaper, softDeletePaper, restoreDeletedPaper, getDeletedPapersByUserId, getPapersByFolderId, createTranslation, getTranslationsByUserId } from "./db";
+import {
+  createPaper,
+  createPaperVersion,
+  deletePaper,
+  getLatestVersionNumber,
+  getPaperById,
+  getPapersByUserId,
+  getPaperVersionById,
+  getPaperVersionsByPaperId,
+  updatePaper,
+  createReference,
+  getReferencesByPaperId,
+  deleteReference,
+  updateReference,
+  createQualityCheck,
+  getQualityChecksByPaperId,
+  getLatestQualityCheck,
+  createKnowledgeDocument,
+  getKnowledgeDocumentById,
+  getKnowledgeDocumentsByUserId,
+  getKnowledgeDocumentsByPaperId,
+  updateKnowledgeDocument,
+  deleteKnowledgeDocument,
+  createChart,
+  getChartsByPaperId,
+  getChartById,
+  updateChart,
+  deleteChart,
+  createFolder,
+  getFoldersByUserId,
+  updateFolder,
+  deleteFolder,
+  createTag,
+  getTagsByUserId,
+  deleteTag,
+  addTagToPaper,
+  removeTagFromPaper,
+  getTagsForPaper,
+  softDeletePaper,
+  restoreDeletedPaper,
+  getDeletedPapersByUserId,
+  getPapersByFolderId,
+  createTranslation,
+  getTranslationsByUserId,
+} from "./db";
 import { checkPaperQuality, checkGrammar } from "./qualityChecker";
 import { formatReference, type ReferenceData } from "./referenceFormatter";
 import { invokeLLM } from "./_core/llm";
 import { TRPCError } from "@trpc/server";
 import { generateWordDocument, generatePdfDocument } from "./documentExport";
 import { polishText, polishParagraphs, type PolishType } from "./textPolisher";
-import { analyzeDocument, chatWithDocument, generateWithRAG } from "./knowledgeBase";
-import { parseCSV, generateChartConfig, generateChartFromDescription } from "./chartGenerator";
-import { generateLatexDocument, getTemplateDescriptions, type JournalTemplate } from "./latexExporter";
-import { translateText, polishTranslation, type TranslationDomain } from "./translator";
+import {
+  analyzeDocument,
+  chatWithDocument,
+  generateWithRAG,
+} from "./knowledgeBase";
+import {
+  parseCSV,
+  generateChartConfig,
+  generateChartFromDescription,
+} from "./chartGenerator";
+import {
+  generateLatexDocument,
+  getTemplateDescriptions,
+  type JournalTemplate,
+} from "./latexExporter";
+import {
+  translateText,
+  polishTranslation,
+  type TranslationDomain,
+} from "./translator";
 import { storagePut } from "./storage";
 
-
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+  // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -33,11 +92,13 @@ export const appRouter = router({
 
   paper: router({
     create: protectedProcedure
-      .input(z.object({
-        title: z.string().min(1),
-        type: z.enum(["graduation", "journal", "proposal", "professional"]),
-        folderId: z.number().optional(),
-      }))
+      .input(
+        z.object({
+          title: z.string().min(1),
+          type: z.enum(["graduation", "journal", "proposal", "professional"]),
+          folderId: z.number().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const paperId = await createPaper({
           userId: ctx.user.id,
@@ -50,10 +111,12 @@ export const appRouter = router({
       }),
 
     generateOutline: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        documentIds: z.array(z.number()).optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          documentIds: z.array(z.number()).optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const paper = await getPaperById(input.id);
         if (!paper) {
@@ -109,41 +172,56 @@ export const appRouter = router({
           });
 
           const outlineContent = response.choices[0]?.message?.content;
-          const outline = typeof outlineContent === 'string' ? outlineContent : "";
+          const outline =
+            typeof outlineContent === "string" ? outlineContent : "";
           await updatePaper(input.id, { outline });
 
           return { outline };
         } catch (error) {
           await updatePaper(input.id, {
             status: "failed",
-            errorMessage: error instanceof Error ? error.message : "生成大纲失败",
+            errorMessage:
+              error instanceof Error ? error.message : "生成大纲失败",
           });
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "生成大纲失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "生成大纲失败",
+          });
         }
       }),
 
     generateContent: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        documentIds: z.array(z.number()).optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          documentIds: z.array(z.number()).optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
-        console.log('[generateContent] Starting for paperId:', input.id);
+        console.log("[generateContent] Starting for paperId:", input.id);
         const paper = await getPaperById(input.id);
         if (!paper) {
-          console.error('[generateContent] Paper not found:', input.id);
+          console.error("[generateContent] Paper not found:", input.id);
           throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
         }
         if (paper.userId !== ctx.user.id) {
-          console.error('[generateContent] Forbidden access:', input.id, 'userId:', ctx.user.id);
+          console.error(
+            "[generateContent] Forbidden access:",
+            input.id,
+            "userId:",
+            ctx.user.id
+          );
           throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
         }
         if (!paper.outline) {
-          console.error('[generateContent] No outline found for paperId:', input.id);
+          console.error(
+            "[generateContent] No outline found for paperId:",
+            input.id
+          );
           throw new TRPCError({ code: "BAD_REQUEST", message: "请先生成大纲" });
         }
 
-        console.log('[generateContent] Calling LLM for paperId:', input.id);
+        console.log("[generateContent] Calling LLM for paperId:", input.id);
         try {
           const typeNames = {
             graduation: "毕业论文",
@@ -191,24 +269,42 @@ export const appRouter = router({
             ],
           });
 
-          console.log('[generateContent] LLM response received for paperId:', input.id);
+          console.log(
+            "[generateContent] LLM response received for paperId:",
+            input.id
+          );
           const contentData = response.choices[0]?.message?.content;
-          const content = typeof contentData === 'string' ? contentData : "";
-          console.log('[generateContent] Content length:', content.length, 'characters');
+          const content = typeof contentData === "string" ? contentData : "";
+          console.log(
+            "[generateContent] Content length:",
+            content.length,
+            "characters"
+          );
           await updatePaper(input.id, {
             content,
             status: "completed",
           });
-          console.log('[generateContent] Paper updated successfully for paperId:', input.id);
+          console.log(
+            "[generateContent] Paper updated successfully for paperId:",
+            input.id
+          );
 
           return { content };
         } catch (error) {
-          console.error('[generateContent] Error occurred for paperId:', input.id, error);
+          console.error(
+            "[generateContent] Error occurred for paperId:",
+            input.id,
+            error
+          );
           await updatePaper(input.id, {
             status: "failed",
-            errorMessage: error instanceof Error ? error.message : "生成内容失败",
+            errorMessage:
+              error instanceof Error ? error.message : "生成内容失败",
           });
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "生成内容失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "生成内容失败",
+          });
         }
       }),
 
@@ -283,10 +379,12 @@ export const appRouter = router({
     }),
 
     moveToFolder: protectedProcedure
-      .input(z.object({
-        paperId: z.number(),
-        folderId: z.number().nullable(),
-      }))
+      .input(
+        z.object({
+          paperId: z.number(),
+          folderId: z.number().nullable(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const paper = await getPaperById(input.paperId);
         if (!paper) {
@@ -310,7 +408,10 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
         }
         if (!paper.content || !paper.outline) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "论文尚未生成完成" });
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "论文尚未生成完成",
+          });
         }
 
         try {
@@ -328,7 +429,10 @@ export const appRouter = router({
 
           return { fileUrl };
         } catch (error) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "导出Word失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "导出Word失败",
+          });
         }
       }),
 
@@ -343,7 +447,10 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此论文" });
         }
         if (!paper.content || !paper.outline) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "论文尚未生成完成" });
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "论文尚未生成完成",
+          });
         }
 
         try {
@@ -361,18 +468,25 @@ export const appRouter = router({
 
           return { fileUrl };
         } catch (error) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "导出PDF失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "导出PDF失败",
+          });
         }
       }),
 
     exportLatex: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        template: z.enum(["generic", "ieee", "nature", "elsevier", "springer"]).default("generic"),
-        authors: z.array(z.string()).optional(),
-        abstract: z.string().optional(),
-        keywords: z.array(z.string()).optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          template: z
+            .enum(["generic", "ieee", "nature", "elsevier", "springer"])
+            .default("generic"),
+          authors: z.array(z.string()).optional(),
+          abstract: z.string().optional(),
+          keywords: z.array(z.string()).optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const paper = await getPaperById(input.id);
         if (!paper) {
@@ -398,11 +512,18 @@ export const appRouter = router({
           });
 
           const fileKey = `papers/${paper.id}/export_${Date.now()}.tex`;
-          const { url: fileUrl } = await storagePut(fileKey, latexContent, "application/x-tex");
+          const { url: fileUrl } = await storagePut(
+            fileKey,
+            latexContent,
+            "application/x-tex"
+          );
 
           return { fileUrl, latexContent };
         } catch (error) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "导出LaTeX失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "导出LaTeX失败",
+          });
         }
       }),
 
@@ -411,12 +532,14 @@ export const appRouter = router({
     }),
 
     saveEdit: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        outline: z.string().optional(),
-        content: z.string().optional(),
-        changeDescription: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          outline: z.string().optional(),
+          content: z.string().optional(),
+          changeDescription: z.string().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const paper = await getPaperById(input.id);
         if (!paper) {
@@ -502,17 +625,20 @@ export const appRouter = router({
 
   reference: router({
     search: protectedProcedure
-      .input(z.object({
-        paperId: z.number(),
-        query: z.string().min(1),
-      }))
+      .input(
+        z.object({
+          paperId: z.number(),
+          query: z.string().min(1),
+        })
+      )
       .mutation(async ({ input }) => {
         try {
           const response = await invokeLLM({
             messages: [
               {
                 role: "system",
-                content: "你是一个学术文献搜索助手。根据用户提供的关键词，搜索并返回真实的、可验证的学术文献。优先使用中文数据库（CNKI、万方）中的文献。返回5-10篇相关文献。",
+                content:
+                  "你是一个学术文献搜索助手。根据用户提供的关键词，搜索并返回真实的、可验证的学术文献。优先使用中文数据库（CNKI、万方）中的文献。返回5-10篇相关文献。",
               },
               {
                 role: "user",
@@ -533,7 +659,11 @@ export const appRouter = router({
                         type: "object",
                         properties: {
                           title: { type: "string", description: "文献标题" },
-                          authors: { type: "array", items: { type: "string" }, description: "作者列表" },
+                          authors: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "作者列表",
+                          },
                           year: { type: "number", description: "发表年份" },
                           journal: { type: "string", description: "期刊名称" },
                           volume: { type: "string", description: "卷号" },
@@ -563,24 +693,31 @@ export const appRouter = router({
           return result.references || [];
         } catch (error: any) {
           console.error("[Reference Search] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "搜索文献失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "搜索文献失败",
+          });
         }
       }),
 
     add: protectedProcedure
-      .input(z.object({
-        paperId: z.number(),
-        title: z.string(),
-        authors: z.array(z.string()),
-        year: z.number().optional(),
-        journal: z.string().optional(),
-        volume: z.string().optional(),
-        issue: z.string().optional(),
-        pages: z.string().optional(),
-        doi: z.string().optional(),
-        url: z.string().optional(),
-        citationFormat: z.enum(["gbt7714", "apa", "mla", "chicago"]).default("gbt7714"),
-      }))
+      .input(
+        z.object({
+          paperId: z.number(),
+          title: z.string(),
+          authors: z.array(z.string()),
+          year: z.number().optional(),
+          journal: z.string().optional(),
+          volume: z.string().optional(),
+          issue: z.string().optional(),
+          pages: z.string().optional(),
+          doi: z.string().optional(),
+          url: z.string().optional(),
+          citationFormat: z
+            .enum(["gbt7714", "apa", "mla", "chicago"])
+            .default("gbt7714"),
+        })
+      )
       .mutation(async ({ input }) => {
         const refData: ReferenceData = {
           title: input.title,
@@ -594,7 +731,10 @@ export const appRouter = router({
           url: input.url,
         };
 
-        const formattedCitation = formatReference(refData, input.citationFormat);
+        const formattedCitation = formatReference(
+          refData,
+          input.citationFormat
+        );
 
         const id = await createReference({
           paperId: input.paperId,
@@ -618,7 +758,7 @@ export const appRouter = router({
       .input(z.object({ paperId: z.number() }))
       .query(async ({ input }) => {
         const refs = await getReferencesByPaperId(input.paperId);
-        return refs.map((ref) => ({
+        return refs.map(ref => ({
           ...ref,
           authors: JSON.parse(ref.authors),
         }));
@@ -632,13 +772,15 @@ export const appRouter = router({
       }),
 
     updateFormat: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        citationFormat: z.enum(["gbt7714", "apa", "mla", "chicago"]),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          citationFormat: z.enum(["gbt7714", "apa", "mla", "chicago"]),
+        })
+      )
       .mutation(async ({ input }) => {
         const refs = await getReferencesByPaperId(0);
-        const ref = refs.find((r) => r.id === input.id);
+        const ref = refs.find(r => r.id === input.id);
         if (!ref) {
           throw new TRPCError({ code: "NOT_FOUND", message: "文献不存在" });
         }
@@ -655,7 +797,10 @@ export const appRouter = router({
           url: ref.url || undefined,
         };
 
-        const formattedCitation = formatReference(refData, input.citationFormat);
+        const formattedCitation = formatReference(
+          refData,
+          input.citationFormat
+        );
 
         await updateReference(input.id, {
           citationFormat: input.citationFormat,
@@ -676,7 +821,10 @@ export const appRouter = router({
         }
 
         if (!paper.content || !paper.outline) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "论文内容或大纲为空" });
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "论文内容或大纲为空",
+          });
         }
 
         try {
@@ -696,7 +844,10 @@ export const appRouter = router({
           return result;
         } catch (error: any) {
           console.error("[Quality Check] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "质量检测失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "质量检测失败",
+          });
         }
       }),
 
@@ -704,7 +855,7 @@ export const appRouter = router({
       .input(z.object({ paperId: z.number() }))
       .query(async ({ input }) => {
         const checks = await getQualityChecksByPaperId(input.paperId);
-        return checks.map((check) => ({
+        return checks.map(check => ({
           ...check,
           issues: check.issues ? JSON.parse(check.issues) : [],
           suggestions: check.suggestions ? JSON.parse(check.suggestions) : [],
@@ -732,37 +883,57 @@ export const appRouter = router({
           return await checkGrammar(input.text);
         } catch (error: any) {
           console.error("[Grammar Check] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "语法检查失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "语法检查失败",
+          });
         }
       }),
   }),
 
   polish: router({
     text: protectedProcedure
-      .input(z.object({
-        text: z.string().min(1),
-        type: z.enum(["expression", "grammar", "academic", "comprehensive"]).default("comprehensive"),
-      }))
+      .input(
+        z.object({
+          text: z.string().min(1),
+          type: z
+            .enum(["expression", "grammar", "academic", "comprehensive"])
+            .default("comprehensive"),
+        })
+      )
       .mutation(async ({ input }) => {
         try {
           return await polishText(input.text, input.type as PolishType);
         } catch (error: any) {
           console.error("[Polish] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "润色失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "润色失败",
+          });
         }
       }),
 
     paragraphs: protectedProcedure
-      .input(z.object({
-        paragraphs: z.array(z.string()),
-        type: z.enum(["expression", "grammar", "academic", "comprehensive"]).default("comprehensive"),
-      }))
+      .input(
+        z.object({
+          paragraphs: z.array(z.string()),
+          type: z
+            .enum(["expression", "grammar", "academic", "comprehensive"])
+            .default("comprehensive"),
+        })
+      )
       .mutation(async ({ input }) => {
         try {
-          return await polishParagraphs(input.paragraphs, input.type as PolishType);
+          return await polishParagraphs(
+            input.paragraphs,
+            input.type as PolishType
+          );
         } catch (error: any) {
           console.error("[Polish Paragraphs] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "批量润色失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "批量润色失败",
+          });
         }
       }),
   }),
@@ -770,17 +941,23 @@ export const appRouter = router({
   // Knowledge Base / RAG
   knowledge: router({
     upload: protectedProcedure
-      .input(z.object({
-        fileName: z.string(),
-        fileContent: z.string(), // base64 encoded
-        mimeType: z.string(),
-        paperId: z.number().optional(),
-      }))
+      .input(
+        z.object({
+          fileName: z.string(),
+          fileContent: z.string(), // base64 encoded
+          mimeType: z.string(),
+          paperId: z.number().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         try {
           const buffer = Buffer.from(input.fileContent, "base64");
           const fileKey = `knowledge/${ctx.user.id}/${Date.now()}_${input.fileName}`;
-          const { url: fileUrl } = await storagePut(fileKey, buffer, input.mimeType);
+          const { url: fileUrl } = await storagePut(
+            fileKey,
+            buffer,
+            input.mimeType
+          );
 
           const docId = await createKnowledgeDocument({
             userId: ctx.user.id,
@@ -796,15 +973,20 @@ export const appRouter = router({
           return { id: docId, fileUrl };
         } catch (error: any) {
           console.error("[Knowledge Upload] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "文件上传失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "文件上传失败",
+          });
         }
       }),
 
     analyze: protectedProcedure
-      .input(z.object({
-        documentId: z.number(),
-        extractedText: z.string(),
-      }))
+      .input(
+        z.object({
+          documentId: z.number(),
+          extractedText: z.string(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const doc = await getKnowledgeDocumentById(input.documentId);
         if (!doc) {
@@ -828,19 +1010,28 @@ export const appRouter = router({
         } catch (error: any) {
           await updateKnowledgeDocument(input.documentId, { status: "failed" });
           console.error("[Knowledge Analyze] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "文档分析失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "文档分析失败",
+          });
         }
       }),
 
     chat: protectedProcedure
-      .input(z.object({
-        documentId: z.number(),
-        question: z.string(),
-        chatHistory: z.array(z.object({
-          role: z.enum(["user", "assistant"]),
-          content: z.string(),
-        })).default([]),
-      }))
+      .input(
+        z.object({
+          documentId: z.number(),
+          question: z.string(),
+          chatHistory: z
+            .array(
+              z.object({
+                role: z.enum(["user", "assistant"]),
+                content: z.string(),
+              })
+            )
+            .default([]),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const doc = await getKnowledgeDocumentById(input.documentId);
         if (!doc) {
@@ -850,15 +1041,25 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此文档" });
         }
         if (!doc.extractedText) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "文档内容未提取" });
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "文档内容未提取",
+          });
         }
 
         try {
-          const answer = await chatWithDocument(doc.extractedText, input.question, input.chatHistory);
+          const answer = await chatWithDocument(
+            doc.extractedText,
+            input.question,
+            input.chatHistory
+          );
           return { answer };
         } catch (error: any) {
           console.error("[Knowledge Chat] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "对话失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "对话失败",
+          });
         }
       }),
 
@@ -914,15 +1115,21 @@ export const appRouter = router({
   // Chart Generation
   chart: router({
     generateFromCSV: protectedProcedure
-      .input(z.object({
-        paperId: z.number(),
-        csvData: z.string(),
-        description: z.string(),
-      }))
+      .input(
+        z.object({
+          paperId: z.number(),
+          csvData: z.string(),
+          description: z.string(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         try {
           const { headers, rows } = parseCSV(input.csvData);
-          const config = await generateChartConfig(rows, headers, input.description);
+          const config = await generateChartConfig(
+            rows,
+            headers,
+            input.description
+          );
 
           const chartId = await createChart({
             paperId: input.paperId,
@@ -942,15 +1149,20 @@ export const appRouter = router({
           return { id: chartId, config };
         } catch (error: any) {
           console.error("[Chart Generate] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message || "图表生成失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error.message || "图表生成失败",
+          });
         }
       }),
 
     generateFromDescription: protectedProcedure
-      .input(z.object({
-        paperId: z.number(),
-        description: z.string(),
-      }))
+      .input(
+        z.object({
+          paperId: z.number(),
+          description: z.string(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         try {
           const config = await generateChartFromDescription(input.description);
@@ -973,7 +1185,10 @@ export const appRouter = router({
           return { id: chartId, config };
         } catch (error: any) {
           console.error("[Chart Generate From Description] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "图表生成失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "图表生成失败",
+          });
         }
       }),
 
@@ -985,7 +1200,26 @@ export const appRouter = router({
           ...chart,
           dataSource: JSON.parse(chart.dataSource),
           chartConfig: JSON.parse(chart.chartConfig),
+          embedUrl: `/charts?paperId=${chart.paperId}&chartId=${chart.id}`,
         }));
+      }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const chart = await getChartById(input.id);
+        if (!chart) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "图表不存在" });
+        }
+        if (chart.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "无权访问此图表" });
+        }
+        return {
+          ...chart,
+          dataSource: JSON.parse(chart.dataSource),
+          chartConfig: JSON.parse(chart.chartConfig),
+          embedUrl: `/charts?paperId=${chart.paperId}&chartId=${chart.id}`,
+        };
       }),
 
     delete: protectedProcedure
@@ -1003,12 +1237,16 @@ export const appRouter = router({
       }),
 
     update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        title: z.string().optional(),
-        chartType: z.enum(["line", "bar", "scatter", "pie", "radar", "area"]).optional(),
-        figureNumber: z.number().optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          title: z.string().optional(),
+          chartType: z
+            .enum(["line", "bar", "scatter", "pie", "radar", "area"])
+            .optional(),
+          figureNumber: z.number().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const chart = await getChartById(input.id);
         if (!chart) {
@@ -1020,7 +1258,8 @@ export const appRouter = router({
         const updates: any = {};
         if (input.title) updates.title = input.title;
         if (input.chartType) updates.chartType = input.chartType;
-        if (input.figureNumber !== undefined) updates.figureNumber = input.figureNumber;
+        if (input.figureNumber !== undefined)
+          updates.figureNumber = input.figureNumber;
         await updateChart(input.id, updates);
         return { success: true };
       }),
@@ -1029,11 +1268,13 @@ export const appRouter = router({
   // Folder management
   folder: router({
     create: protectedProcedure
-      .input(z.object({
-        name: z.string().min(1),
-        parentId: z.number().optional(),
-        color: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          name: z.string().min(1),
+          parentId: z.number().optional(),
+          color: z.string().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const id = await createFolder({
           userId: ctx.user.id,
@@ -1049,11 +1290,13 @@ export const appRouter = router({
     }),
 
     update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        name: z.string().optional(),
-        color: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          color: z.string().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const updates: any = {};
         if (input.name) updates.name = input.name;
@@ -1073,10 +1316,12 @@ export const appRouter = router({
   // Tag management
   tag: router({
     create: protectedProcedure
-      .input(z.object({
-        name: z.string().min(1),
-        color: z.string().optional(),
-      }))
+      .input(
+        z.object({
+          name: z.string().min(1),
+          color: z.string().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         const id = await createTag({
           userId: ctx.user.id,
@@ -1098,20 +1343,24 @@ export const appRouter = router({
       }),
 
     addToPaper: protectedProcedure
-      .input(z.object({
-        paperId: z.number(),
-        tagId: z.number(),
-      }))
+      .input(
+        z.object({
+          paperId: z.number(),
+          tagId: z.number(),
+        })
+      )
       .mutation(async ({ input }) => {
         await addTagToPaper(input.paperId, input.tagId);
         return { success: true };
       }),
 
     removeFromPaper: protectedProcedure
-      .input(z.object({
-        paperId: z.number(),
-        tagId: z.number(),
-      }))
+      .input(
+        z.object({
+          paperId: z.number(),
+          tagId: z.number(),
+        })
+      )
       .mutation(async ({ input }) => {
         await removeTagFromPaper(input.paperId, input.tagId);
         return { success: true };
@@ -1127,13 +1376,26 @@ export const appRouter = router({
   // Translation
   translation: router({
     translate: protectedProcedure
-      .input(z.object({
-        text: z.string().min(1),
-        sourceLang: z.string(),
-        targetLang: z.string(),
-        domain: z.enum(["general", "computer_science", "medicine", "law", "economics", "engineering", "natural_science", "social_science"]).default("general"),
-        paperId: z.number().optional(),
-      }))
+      .input(
+        z.object({
+          text: z.string().min(1),
+          sourceLang: z.string(),
+          targetLang: z.string(),
+          domain: z
+            .enum([
+              "general",
+              "computer_science",
+              "medicine",
+              "law",
+              "economics",
+              "engineering",
+              "natural_science",
+              "social_science",
+            ])
+            .default("general"),
+          paperId: z.number().optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         try {
           const result = await translateText(
@@ -1156,16 +1418,32 @@ export const appRouter = router({
           return result;
         } catch (error: any) {
           console.error("[Translation] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "翻译失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "翻译失败",
+          });
         }
       }),
 
     polish: protectedProcedure
-      .input(z.object({
-        text: z.string().min(1),
-        language: z.string(),
-        domain: z.enum(["general", "computer_science", "medicine", "law", "economics", "engineering", "natural_science", "social_science"]).default("general"),
-      }))
+      .input(
+        z.object({
+          text: z.string().min(1),
+          language: z.string(),
+          domain: z
+            .enum([
+              "general",
+              "computer_science",
+              "medicine",
+              "law",
+              "economics",
+              "engineering",
+              "natural_science",
+              "social_science",
+            ])
+            .default("general"),
+        })
+      )
       .mutation(async ({ input }) => {
         try {
           const polished = await polishTranslation(
@@ -1176,7 +1454,10 @@ export const appRouter = router({
           return { polishedText: polished };
         } catch (error: any) {
           console.error("[Translation Polish] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "润色失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "润色失败",
+          });
         }
       }),
 
@@ -1186,15 +1467,19 @@ export const appRouter = router({
   }),
 
   // LaTeX Export
-  latex: router({ 
+  latex: router({
     export: protectedProcedure
-      .input(z.object({
-        paperId: z.number(),
-        template: z.enum(["generic", "ieee", "nature", "elsevier", "springer"]).default("generic"),
-        authors: z.array(z.string()).optional(),
-        abstract: z.string().optional(),
-        keywords: z.array(z.string()).optional(),
-      }))
+      .input(
+        z.object({
+          paperId: z.number(),
+          template: z
+            .enum(["generic", "ieee", "nature", "elsevier", "springer"])
+            .default("generic"),
+          authors: z.array(z.string()).optional(),
+          abstract: z.string().optional(),
+          keywords: z.array(z.string()).optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
         try {
           const paper = await getPaperById(input.paperId);
@@ -1202,7 +1487,10 @@ export const appRouter = router({
             throw new TRPCError({ code: "NOT_FOUND", message: "论文不存在" });
           }
           if (paper.userId !== ctx.user.id) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "无权导出此论文" });
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "无权导出此论文",
+            });
           }
 
           const latestVersion = await getPaperVersionsByPaperId(input.paperId);
@@ -1221,17 +1509,20 @@ export const appRouter = router({
           });
 
           // Upload to S3
-          const fileName = `${paper.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.tex`;
+          const fileName = `${paper.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "_")}.tex`;
           const { url, key } = await storagePut(
             `latex/${ctx.user.id}/${Date.now()}_${fileName}`,
-            Buffer.from(latexContent, 'utf-8'),
-            'application/x-tex'
+            Buffer.from(latexContent, "utf-8"),
+            "application/x-tex"
           );
 
           return { url, fileName, latexContent };
         } catch (error: any) {
           console.error("[LaTeX Export] Error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "导出失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "导出失败",
+          });
         }
       }),
 
@@ -1256,44 +1547,54 @@ export const appRouter = router({
         }
 
         const totalPapers = papers.length;
-        const completedPapers = papers.filter((p) => p.status === "completed").length;
+        const completedPapers = papers.filter(
+          p => p.status === "completed"
+        ).length;
         const averageQualityScore =
           qualityChecks.length > 0
-            ? qualityChecks.reduce((sum, c) => sum + c.overallScore, 0) / qualityChecks.length
+            ? qualityChecks.reduce((sum, c) => sum + c.overallScore, 0) /
+              qualityChecks.length
             : 0;
 
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentChecks = qualityChecks
-          .filter((c) => new Date(c.createdAt) >= thirtyDaysAgo)
-          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+          .filter(c => new Date(c.createdAt) >= thirtyDaysAgo)
+          .sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
 
-        const qualityTrend = recentChecks.map((check) => ({
+        const qualityTrend = recentChecks.map(check => ({
           date: new Date(check.createdAt).toISOString().split("T")[0],
           score: check.overallScore,
         }));
 
         const formatCounts: Record<string, number> = {};
-        references.forEach((ref) => {
+        references.forEach(ref => {
           const format = ref.citationFormat || "gbt7714";
           formatCounts[format] = (formatCounts[format] || 0) + 1;
         });
 
-        const citationFormatDistribution = Object.entries(formatCounts).map(([format, count]) => ({
-          format,
-          count,
-        }));
+        const citationFormatDistribution = Object.entries(formatCounts).map(
+          ([format, count]) => ({
+            format,
+            count,
+          })
+        );
 
         const typeCounts: Record<string, number> = {};
-        papers.forEach((paper) => {
+        papers.forEach(paper => {
           const type = paper.type || "unknown";
           typeCounts[type] = (typeCounts[type] || 0) + 1;
         });
 
-        const paperTypeDistribution = Object.entries(typeCounts).map(([type, count]) => ({
-          type,
-          count,
-        }));
+        const paperTypeDistribution = Object.entries(typeCounts).map(
+          ([type, count]) => ({
+            type,
+            count,
+          })
+        );
 
         // Knowledge base stats
         const knowledgeDocs = await getKnowledgeDocumentsByUserId(ctx.user.id);
@@ -1306,7 +1607,7 @@ export const appRouter = router({
           citationFormatDistribution,
           paperTypeDistribution,
           totalDocuments: knowledgeDocs.length,
-          recentPapers: papers.slice(0, 5).map((p) => ({
+          recentPapers: papers.slice(0, 5).map(p => ({
             id: p.id,
             title: p.title,
             type: p.type,
@@ -1316,7 +1617,10 @@ export const appRouter = router({
         };
       } catch (error: any) {
         console.error("[Dashboard] Error:", error);
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "获取统计数据失败" });
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "获取统计数据失败",
+        });
       }
     }),
 
@@ -1346,7 +1650,10 @@ export const appRouter = router({
           return comparisons;
         } catch (error: any) {
           console.error("[Dashboard] Quality comparison error:", error);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "质量对比失败" });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "质量对比失败",
+          });
         }
       }),
   }),
