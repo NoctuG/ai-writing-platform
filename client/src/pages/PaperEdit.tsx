@@ -1,5 +1,9 @@
 import React from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import {
+  defaultPaperStructureByType,
+  type PaperStructureConfig,
+} from "@shared/types";
 import { Button } from "@/components/fluent/button";
 import {
   Card,
@@ -38,6 +42,7 @@ import {
   FileCode,
   Focus,
   Minimize,
+  AlertTriangle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
@@ -98,6 +103,7 @@ export default function PaperEdit() {
   const [showLatexDialog, setShowLatexDialog] = useState(false);
   const [showChartDialog, setShowChartDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<"outline" | "content">("outline");
+  const [structureTemplate, setStructureTemplate] = useState<"paperDefault" | "graduationRequired">("paperDefault");
   const [latexTemplate, setLatexTemplate] = useState<LatexTemplateId>(
     "generic"
   );
@@ -291,6 +297,21 @@ export default function PaperEdit() {
     const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`;
     window.history.replaceState({}, "", nextUrl);
   }, [isFocusMode]);
+
+
+  const activePaperType =
+    paper?.type && paper.type in defaultPaperStructureByType
+      ? (paper.type as keyof typeof defaultPaperStructureByType)
+      : "graduation";
+
+  const structureConfig: PaperStructureConfig[] =
+    structureTemplate === "graduationRequired"
+      ? defaultPaperStructureByType.graduation.slice()
+      : defaultPaperStructureByType[activePaperType].slice();
+
+  const enabledModules = structureConfig
+    .filter(item => item.enabled)
+    .sort((a, b) => a.order - b.order);
 
   const handleSave = () => {
     setIsSaving(true);
@@ -673,65 +694,110 @@ export default function PaperEdit() {
           </div>
 
           {!isFocusMode && (
-            <div className="flex justify-end">
-              <Dialog open={showChartDialog} onOpenChange={setShowChartDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">插入图表</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>选择图表</DialogTitle>
-                    <DialogDescription>
-                      选择图表后将插入到当前编辑中的标签页
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    {!chartList || chartList.length === 0 ? (
-                      <FluentEmptyState
-                        icon={FileCode}
-                        title="当前论文暂无可用图表"
-                        copy={createEmptyStateCopy({
-                          reason: "图表库中还没有与本论文关联的数据可视化内容。",
-                          nextStep: "前往图表工具创建图表并保存，随后即可一键插入当前文稿。",
-                          actionLabel: "去图表工具",
-                        })}
-                        primaryAction={{
-                          label: "去图表工具",
-                          onClick: () => {
-                            setShowChartDialog(false);
-                            setLocation("/charts");
-                          },
-                          variant: "outline",
-                        }}
-                        className="p-5"
-                      />
-                    ) : (
-                      chartList.map(chart => (
-                        <Card key={chart.id}>
-                          <CardContent className="py-4 flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-medium">{chart.title}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {chart.chartType} ·{" "}
-                                {new Date(chart.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                insertChartMarkdown(toChartMarkdown(chart));
-                                setShowChartDialog(false);
-                              }}
-                            >
-                              插入
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))
-                    )}
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Dialog open={showChartDialog} onOpenChange={setShowChartDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">插入图表</Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>选择图表</DialogTitle>
+                      <DialogDescription>
+                        选择图表后将插入到当前编辑中的标签页
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                      {!chartList || chartList.length === 0 ? (
+                        <FluentEmptyState
+                          icon={FileCode}
+                          title="当前论文暂无可用图表"
+                          copy={createEmptyStateCopy({
+                            reason: "图表库中还没有与本论文关联的数据可视化内容。",
+                            nextStep: "前往图表工具创建图表并保存，随后即可一键插入当前文稿。",
+                            actionLabel: "去图表工具",
+                          })}
+                          primaryAction={{
+                            label: "去图表工具",
+                            onClick: () => {
+                              setShowChartDialog(false);
+                              setLocation("/charts");
+                            },
+                            variant: "outline",
+                          }}
+                          className="p-5"
+                        />
+                      ) : (
+                        chartList.map(chart => (
+                          <Card key={chart.id}>
+                            <CardContent className="py-4 flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{chart.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {chart.chartType} ·{" "}
+                                  {new Date(chart.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  insertChartMarkdown(toChartMarkdown(chart));
+                                  setShowChartDialog(false);
+                                }}
+                              >
+                                插入
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">论文结构模板</CardTitle>
+                  <CardDescription>
+                    请选择结构模板并按模块顺序编辑，避免误删毕业论文必选模块。
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant={
+                        structureTemplate === "paperDefault" ? "default" : "outline"
+                      }
+                      onClick={() => setStructureTemplate("paperDefault")}
+                    >
+                      当前论文类型默认模板
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={
+                        structureTemplate === "graduationRequired"
+                          ? "default"
+                          : "outline"
+                      }
+                      onClick={() => setStructureTemplate("graduationRequired")}
+                    >
+                      毕业论文全模块模板
+                    </Button>
                   </div>
-                </DialogContent>
-              </Dialog>
+                  <div className="text-sm text-muted-foreground">
+                    模块顺序：
+                    {enabledModules.map(item => `${item.order}. ${item.label}`).join(" → ")}
+                  </div>
+                  <div className="rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-700 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5" />
+                    <span>
+                      提示：封面、诚信声明、授权书、摘要关键词、正文、参考文献、致谢均为毕业论文必选模块，请勿删除；其中“致谢”必须在“参考文献”之后。
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
