@@ -1206,7 +1206,7 @@ export const appRouter = router({
           }
 
           const latestVersion = await getPaperVersionsByPaperId(input.paperId);
-          const content = latestVersion[0]?.fullContent || paper.fullContent || "";
+          const content = latestVersion[0]?.content || paper.content || "";
           const outline = latestVersion[0]?.outline || paper.outline || "";
 
           const latexContent = generateLatexDocument({
