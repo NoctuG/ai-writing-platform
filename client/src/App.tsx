@@ -1,7 +1,9 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AnimatePresence, motion } from "framer-motion";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import type { ReactNode } from "react";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -14,24 +16,117 @@ import ChartTools from "./pages/ChartTools";
 import TranslationTools from "./pages/TranslationTools";
 import RecycleBin from "./pages/RecycleBin";
 
+interface PageTransitionProps {
+  children: ReactNode;
+  shouldAnimate: boolean;
+}
+
+function PageTransition({ children, shouldAnimate }: PageTransitionProps) {
+  if (!shouldAnimate) {
+    return <>{children}</>;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.16, ease: "easeOut" }}
+      className="min-h-screen bg-background text-foreground"
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 function Router() {
-  return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path="/papers" component={PaperList} />
-      <Route path="/paper/:id" component={PaperGenerate} />
-      <Route path="/paper/:id/edit" component={PaperEdit} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/knowledge" component={KnowledgeBase} />
-      <Route path="/charts" component={ChartTools} />
-      <Route path="/translation" component={TranslationTools} />
-      <Route path="/recycle-bin" component={RecycleBin} />
+  const [location] = useLocation();
+  const disableTransition = /^\/paper\/[^/]+\/edit$/.test(location);
 
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <Switch key={location} location={location}>
+        <Route path={"/"}>
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <Home />
+            </PageTransition>
+          )}
+        </Route>
+        <Route path="/papers">
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <PaperList />
+            </PageTransition>
+          )}
+        </Route>
+        <Route path="/paper/:id">
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <PaperGenerate />
+            </PageTransition>
+          )}
+        </Route>
+        <Route path="/paper/:id/edit">
+          {() => (
+            <PageTransition shouldAnimate={false}>
+              <PaperEdit />
+            </PageTransition>
+          )}
+        </Route>
+        <Route path="/dashboard">
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <Dashboard />
+            </PageTransition>
+          )}
+        </Route>
+        <Route path="/knowledge">
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <KnowledgeBase />
+            </PageTransition>
+          )}
+        </Route>
+        <Route path="/charts">
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <ChartTools />
+            </PageTransition>
+          )}
+        </Route>
+        <Route path="/translation">
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <TranslationTools />
+            </PageTransition>
+          )}
+        </Route>
+        <Route path="/recycle-bin">
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <RecycleBin />
+            </PageTransition>
+          )}
+        </Route>
+
+        <Route path={"/404"}>
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <NotFound />
+            </PageTransition>
+          )}
+        </Route>
+        {/* Final fallback route */}
+        <Route>
+          {() => (
+            <PageTransition shouldAnimate={!disableTransition}>
+              <NotFound />
+            </PageTransition>
+          )}
+        </Route>
+      </Switch>
+    </AnimatePresence>
   );
 }
 
@@ -43,10 +138,7 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        switchable
-      >
+      <ThemeProvider defaultTheme="light" switchable>
         <TooltipProvider>
           <Toaster />
           <Router />
