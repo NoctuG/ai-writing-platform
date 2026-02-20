@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "https://files.manuscdn.com/user_upload_by_module/session_file/310419663026724091/BUJtSXjjinRqhujh.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "https://files.manuscdn.com/user_upload_by_module/session_file/310419663026724091/bSMNRNYkwibqMlwm.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
