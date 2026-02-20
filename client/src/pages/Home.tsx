@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { BarChart3, BookOpen, FileText, FolderOpen, GraduationCap, Languages, Sparkles, Database, FileCode } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -158,6 +159,7 @@ export default function Home() {
             AI学术论文写作平台
           </h1>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <Button variant="ghost" onClick={() => setLocation("/dashboard")}>
               仪表板
             </Button>

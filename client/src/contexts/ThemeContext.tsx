@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { FluentProvider } from "@fluentui/react-components";
+import { getTheme, ThemeMode } from "@/lib/fluentTheme";
 
 type Theme = "light" | "dark";
 
@@ -48,9 +50,13 @@ export function ThemeProvider({
       }
     : undefined;
 
+  const fluentTheme = getTheme(theme as ThemeMode);
+
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, switchable }}>
-      {children}
+      <FluentProvider theme={fluentTheme}>
+        {children}
+      </FluentProvider>
     </ThemeContext.Provider>
   );
 }
