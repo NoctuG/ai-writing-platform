@@ -33,6 +33,9 @@ vi.mock("@/lib/trpc", () => ({
       getHistory: { useQuery: () => ({ data: [] }) },
       check: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
+    chart: {
+      list: { useQuery: () => ({ data: [] }) },
+    },
     latex: {
       getTemplates: {
         useQuery: () => ({

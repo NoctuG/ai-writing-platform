@@ -37,7 +37,9 @@ import {
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
-import MarkdownEditor from "@/components/MarkdownEditor";
+import MarkdownEditor, {
+  type MarkdownEditorHandle,
+} from "@/components/MarkdownEditor";
 import ReferenceManager from "@/components/ReferenceManager";
 import QualityCheckResult from "@/components/QualityCheckResult";
 import PolishToolbar from "@/components/PolishToolbar";
@@ -74,10 +76,14 @@ export default function PaperEdit() {
     () => new URLSearchParams(window.location.search).get("focus") === "1"
   );
   const [showLatexDialog, setShowLatexDialog] = useState(false);
+  const [showChartDialog, setShowChartDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<"outline" | "content">("outline");
   const [latexTemplate, setLatexTemplate] = useState<
     "generic" | "ieee" | "nature" | "elsevier" | "springer"
   >("generic");
   const utils = trpc.useUtils();
+  const outlineEditorRef = React.useRef<MarkdownEditorHandle>(null);
+  const contentEditorRef = React.useRef<MarkdownEditorHandle>(null);
 
   const { data: paper, isLoading } = trpc.paper.getById.useQuery(
     { id: paperId },
@@ -151,6 +157,10 @@ export default function PaperEdit() {
   });
 
   const { data: latexTemplates } = trpc.latex.getTemplates.useQuery();
+  const { data: chartList } = trpc.chart.list.useQuery(
+    { paperId },
+    { enabled: !!paperId && isAuthenticated }
+  );
 
   const exportLatexMutation = trpc.latex.export.useMutation({
     onSuccess: data => {
@@ -218,6 +228,26 @@ export default function PaperEdit() {
 
   const handleRestoreVersion = (versionId: number) => {
     restoreVersionMutation.mutate({ versionId });
+  };
+
+  const insertChartMarkdown = (markdown: string) => {
+    const targetRef =
+      activeTab === "outline" ? outlineEditorRef : contentEditorRef;
+    targetRef.current?.insertAtCursor(markdown);
+    toast.success("图表已插入编辑器");
+  };
+
+  const toChartMarkdown = (chart: {
+    title: string;
+    embedUrl: string;
+    figureNumber: number | null;
+    description: string | null;
+  }) => {
+    const figurePrefix = chart.figureNumber
+      ? `图${chart.figureNumber}：`
+      : "图表：";
+    const summary = chart.description ? `\n\n> ${chart.description}` : "";
+    return `![${figurePrefix}${chart.title}](${chart.embedUrl})${summary}\n`;
   };
 
   if (authLoading || isLoading) {
@@ -532,11 +562,61 @@ export default function PaperEdit() {
             "max-w-none px-2 md:px-4 py-2 md:py-4 min-h-[calc(100vh-3rem)]"
         )}
       >
-        <Tabs defaultValue="outline" className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as "outline" | "content")}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="outline">编辑大纲</TabsTrigger>
             <TabsTrigger value="content">编辑全文</TabsTrigger>
           </TabsList>
+
+          <div className="flex justify-end">
+            <Dialog open={showChartDialog} onOpenChange={setShowChartDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline">插入图表</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>选择图表</DialogTitle>
+                  <DialogDescription>
+                    选择图表后将插入到当前编辑中的标签页
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  {!chartList || chartList.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      当前论文暂无可用图表，请先在图表工具中生成图表。
+                    </p>
+                  ) : (
+                    chartList.map(chart => (
+                      <Card key={chart.id}>
+                        <CardContent className="py-4 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{chart.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {chart.chartType} ·{" "}
+                              {new Date(chart.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              insertChartMarkdown(toChartMarkdown(chart));
+                              setShowChartDialog(false);
+                            }}
+                          >
+                            插入
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
 
           <TabsContent value="outline" className="space-y-4">
             <Card
@@ -579,6 +659,7 @@ export default function PaperEdit() {
                   }}
                 >
                   <MarkdownEditor
+                    ref={outlineEditorRef}
                     value={outline}
                     onChange={setOutline}
                     placeholder="请输入论文大纲..."
@@ -630,6 +711,7 @@ export default function PaperEdit() {
                   }}
                 >
                   <MarkdownEditor
+                    ref={contentEditorRef}
                     value={content}
                     onChange={setContent}
                     placeholder="请输入论文全文..."
