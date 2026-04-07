@@ -7,17 +7,22 @@ import {
   Body1,
   Button,
   Card,
+  Checkbox,
   Field,
   makeStyles,
   shorthands,
   Spinner,
   Subtitle1,
   Text,
+  Textarea,
   Title1,
   tokens,
   Dropdown,
   Option,
   Input,
+  Radio,
+  RadioGroup,
+  Slider,
   mergeClasses,
 } from "@fluentui/react-components";
 import {
@@ -194,8 +199,16 @@ export default function Home() {
   const styles = useStyles();
   const { user, loading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
-  const [selectedType, setSelectedType] = useState<string>("");
-  const [title, setTitle] = useState("");
+  const [selectedType, setSelectedType] = useState<string>("graduation");
+  const [degreeType, setDegreeType] = useState<"本科" | "硕士">("硕士");
+  const [discipline, setDiscipline] = useState("工学");
+  const [topicMode, setTopicMode] = useState<"active" | "auto">("active");
+  const [topic, setTopic] = useState("");
+  const [detailedRequirements, setDetailedRequirements] = useState("");
+  const [wordCount, setWordCount] = useState(15000);
+  const [cnRefs, setCnRefs] = useState(15);
+  const [enRefs, setEnRefs] = useState(10);
+  const [agreedDisclaimer, setAgreedDisclaimer] = useState(false);
 
   const createPaperMutation = trpc.paper.create.useMutation({
     onSuccess: (data) => {
@@ -209,13 +222,26 @@ export default function Home() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedType || !title.trim()) {
-      toast.error("请选择论文类型并输入标题");
+    if (!selectedType || (topicMode === "active" && !topic.trim())) {
+      toast.error("请完善论文基础信息并输入研究课题");
       return;
     }
+    if (!agreedDisclaimer) {
+      toast.error("请先勾选免责声明后再继续");
+      return;
+    }
+
+    const normalizedTopic =
+      topicMode === "auto" && !topic.trim()
+        ? `请基于${discipline}${degreeType}研究趋势智能推荐选题`
+        : topic.trim();
+
+    const composedTitle = `${normalizedTopic}
+【配置】学位=${degreeType}；学科=${discipline}；字数=${wordCount}；中文文献=${cnRefs}；英文文献=${enRefs}${detailedRequirements.trim() ? `；补充要求=${detailedRequirements.trim()}` : ""}`;
+
     createPaperMutation.mutate({
       type: selectedType as "graduation" | "journal" | "proposal" | "professional",
-      title: title.trim(),
+      title: composedTitle,
     });
   };
 
@@ -267,9 +293,9 @@ export default function Home() {
         {isAuthenticated ? (
           <Card className={styles.formCard}>
             <Title1>创建新论文</Title1>
-            <Body1 className={styles.heroSubtitle}>请选择论文类型并输入您的论文标题</Body1>
+            <Body1 className={styles.heroSubtitle}>请按工作流逐步完成配置，然后继续获取论文大纲</Body1>
             <form onSubmit={handleSubmit} className={styles.form}>
-              <Field label="论文类型" required>
+              <Field label="1. 基础信息配置 · 论文类型" required>
                 <Dropdown
                   value={selectedType ? paperTypes.find((type) => type.value === selectedType)?.label : undefined}
                   placeholder="请选择论文类型"
@@ -290,16 +316,92 @@ export default function Home() {
                 </Dropdown>
               </Field>
 
-              <Field label="论文标题" required>
+              <Field label="1. 基础信息配置 · 学位类型" required>
+                <RadioGroup
+                  layout="horizontal"
+                  value={degreeType}
+                  onChange={(_, data) => setDegreeType(data.value as "本科" | "硕士")}
+                >
+                  <Radio value="本科" label="本科" />
+                  <Radio value="硕士" label="硕士" />
+                </RadioGroup>
+              </Field>
+
+              <Field label="1. 基础信息配置 · 学科门类" required>
                 <Input
-                  placeholder="请输入您的论文标题"
-                  value={title}
-                  onChange={(_, data) => setTitle(data.value)}
+                  placeholder="例如：工学 / 管理学 / 医学"
+                  value={discipline}
+                  onChange={(_, data) => setDiscipline(data.value)}
                 />
               </Field>
 
-              <Button appearance="primary" type="submit" disabled={createPaperMutation.isPending || !selectedType || !title.trim()}>
-                {createPaperMutation.isPending ? "创建中..." : "开始生成论文"}
+              <Field label="2. 论文选题与主题输入 · 模式选择" required>
+                <RadioGroup
+                  layout="horizontal"
+                  value={topicMode}
+                  onChange={(_, data) => setTopicMode(data.value as "active" | "auto")}
+                >
+                  <Radio value="active" label="主动模式（我来输入课题）" />
+                  <Radio value="auto" label="自动模式（AI 辅助推荐）" />
+                </RadioGroup>
+              </Field>
+
+              <Field label="2. 论文选题与主题输入 · 研究课题（500字内）" required={topicMode === "active"}>
+                <Textarea
+                  resize="vertical"
+                  rows={4}
+                  maxLength={500}
+                  placeholder={topicMode === "active" ? "请输入具体论文题目或研究方向" : "可留空，系统将结合学位与学科自动推荐"}
+                  value={topic}
+                  onChange={(_, data) => setTopic(data.value)}
+                />
+              </Field>
+
+              <Field label="3. 补充详细要求（可选，1000字内）">
+                <Textarea
+                  resize="vertical"
+                  rows={5}
+                  maxLength={1000}
+                  placeholder="可填写论证思路、研究观点、实验数据要求或避坑指南"
+                  value={detailedRequirements}
+                  onChange={(_, data) => setDetailedRequirements(data.value)}
+                />
+              </Field>
+
+              <Field label="4. 生成参数设置 · 目标字数">
+                <RadioGroup
+                  layout="horizontal"
+                  value={String(wordCount)}
+                  onChange={(_, data) => setWordCount(Number(data.value))}
+                >
+                  <Radio value="6000" label="6000 字" />
+                  <Radio value="15000" label="15000 字" />
+                  <Radio value="25000" label="25000 字" />
+                </RadioGroup>
+              </Field>
+
+              <Field label={`4. 生成参数设置 · 中文参考文献数量：${cnRefs}`}>
+                <Slider min={0} max={50} step={1} value={cnRefs} onChange={(_, data) => setCnRefs(data.value)} />
+              </Field>
+
+              <Field label={`4. 生成参数设置 · 英文参考文献数量：${enRefs}`}>
+                <Slider min={0} max={50} step={1} value={enRefs} onChange={(_, data) => setEnRefs(data.value)} />
+              </Field>
+
+              <Field>
+                <Checkbox
+                  checked={agreedDisclaimer}
+                  onChange={(_, data) => setAgreedDisclaimer(Boolean(data.checked))}
+                  label="我已阅读并同意：生成内容仅供参考学习，不作为最终成品直接提交。"
+                />
+              </Field>
+
+              <Button
+                appearance="primary"
+                type="submit"
+                disabled={createPaperMutation.isPending || !selectedType || (topicMode === "active" && !topic.trim()) || !agreedDisclaimer}
+              >
+                {createPaperMutation.isPending ? "创建中..." : "下一步：获取论文大纲"}
               </Button>
             </form>
           </Card>
